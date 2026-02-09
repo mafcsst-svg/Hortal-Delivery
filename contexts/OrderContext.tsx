@@ -17,6 +17,7 @@ interface OrderContextType {
   updateObservation: (id: string, obs: string) => void;
   clearCart: () => void;
   refreshOrders: () => Promise<void>;
+  updateOrderStatus: (orderId: string, nextStatus: any) => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -165,6 +166,34 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearCart = () => setCart([]);
 
+  const updateOrderStatus = async (orderId: string, nextStatus: any) => {
+    try {
+      // Optimistic update
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: nextStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Broadcast via the existing channel
+      const channel = supabase.channel('schema-db-changes');
+      await channel.send({
+        type: 'broadcast',
+        event: 'order_status_sync',
+        payload: { orderId, status: nextStatus }
+      });
+
+      await fetchOrders();
+    } catch (err: any) {
+      console.error('Error updating status:', err);
+      await fetchOrders();
+      throw err;
+    }
+  };
+
   return (
     <OrderContext.Provider value={{
       cart, setCart,
@@ -172,7 +201,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       messages, setMessages,
       earnedCashback, setEarnedCashback,
       addToCart, updateCartQuantity, updateObservation, clearCart,
-      refreshOrders: fetchOrders
+      refreshOrders: fetchOrders,
+      updateOrderStatus
     }}>
       {children}
     </OrderContext.Provider>

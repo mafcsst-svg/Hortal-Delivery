@@ -16,7 +16,7 @@ import { supabase } from '../services/supabaseClient';
 export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user, updateUserProfile, allUsers, setAllUsers, settings, setSettings, logout } = useUser();
   const { products, setProducts } = useProducts();
-  const { orders, setOrders, messages, setMessages, refreshOrders } = useOrder();
+  const { orders, setOrders, messages, setMessages, refreshOrders, updateOrderStatus } = useOrder();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'messages' | 'products' | 'settings' | 'analytics' | 'manual-order' | 'customers'>('orders');
   const [orderSubTab, setOrderSubTab] = useState<'active' | 'history'>('active');
@@ -102,35 +102,9 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
   };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: OrderStatus) => {
-    console.log('Tentando atualizar pedido para status:', nextStatus);
-
-    // Optimistic update
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
-
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: nextStatus })
-        .eq('id', orderId);
-
-      if (error) throw error;
-
-      console.log('Status atualizado com sucesso no DB.');
-
-      // Ultra-fast Broadcast sync
-      await supabase.channel('schema-db-changes').send({
-        type: 'broadcast',
-        event: 'order_status_sync',
-        payload: { orderId, status: nextStatus }
-      });
-      console.log('Broadcast sincronizado.');
-
-      // Manual refresh as backup for realtime
-      await refreshOrders();
+      await updateOrderStatus(orderId, nextStatus);
     } catch (err: any) {
-      console.error('Error updating status:', err);
-      // Rollback on error
-      await refreshOrders();
       alert('Erro ao atualizar status: ' + err.message);
     }
   };
