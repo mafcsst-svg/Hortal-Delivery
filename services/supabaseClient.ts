@@ -20,5 +20,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
     supabaseUrl || 'https://missing-url.supabase.co',
-    supabaseAnonKey || 'missing-key'
+    supabaseAnonKey || 'missing-key',
+    {
+        realtime: {
+            params: {
+                eventsPerSecond: 10,
+            },
+        },
+    }
 );

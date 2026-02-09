@@ -258,18 +258,31 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchOrders();
     fetchMessages();
 
-    // 1. Subscribe to Postgres Changes for Orders
-    const dbChannel = supabase
-      .channel('db-orders')
+    // ------------------------------------------------------------------
+    // SINGLE CHANNEL REALTIME SETUP
+    // ------------------------------------------------------------------
+    const channelName = 'global-orders-room';
+
+    // Cleanup any existing subscription before creating a new one (safety)
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const channel = supabase.channel(channelName, {
+      config: {
+        broadcast: { self: true },
+        presence: { key: user?.id || 'anon' },
+      },
+    });
+
+    channel
+      // 1. Postgres Changes for ORDERS (UPDATE & INSERT)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders'
-        },
+        { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
-          console.log('Postgres Change Order:', payload.eventType);
+          console.log('Realtime Order Event:', payload.eventType);
           if (payload.eventType === 'UPDATE' && payload.new) {
             const updated = payload.new;
             setOrders(prev => prev.map(o => o.id === updated.id ? {
@@ -278,39 +291,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               deliveryCode: updated.delivery_code || o.deliveryCode
             } : o));
           } else {
+            // INSERT or DELETE
             fetchOrders();
           }
         }
       )
-      .subscribe((status, err) => {
-        console.log('Orders Realtime Channel Status:', status);
-        if (err) console.error('Orders Realtime Channel Error:', err);
-
-        if (status === 'SUBSCRIBED') {
-          setIsRealtimeConnected(true);
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setIsRealtimeConnected(false);
-          if (status === 'TIMED_OUT') {
-            console.warn('Realtime connection timed out, check network or Supabase state.');
-          }
-        }
-      });
-
-    // 2. Subscribe to Messages Changes via postgres_changes (REALTIME PRIMARY)
-    const msgChannel = supabase
-      .channel('db-messages-realtime')
+      // 2. Postgres Changes for MESSAGES (INSERT)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
-          console.log('🔴 Postgres Realtime Message INSERT:', payload.new);
           const m = payload.new as any;
-
-          // Filtrar por customer_id se não for admin
+          // Security/Privacy Filter:
+          // Admin sees all. Customer sees only their own.
           if (user?.role !== 'admin' && m.customer_id !== user?.id) {
             return;
           }
@@ -327,7 +320,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
 
           setMessages(prev => {
-            // Evitar duplicatas (pode já ter sido adicionada como mensagem otimista)
+            // Deduplicate logic (optimistic UI vs server response)
             const exists = prev.find(existing =>
               existing.id === newMessage.id ||
               (existing.id.startsWith('temp-') &&
@@ -335,9 +328,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 existing.senderId === newMessage.senderId)
             );
             if (exists) {
-              // Substituir mensagem temporária pela real
               if (exists.id.startsWith('temp-')) {
-                return prev.map(m => m.id === exists.id ? newMessage : m);
+                return prev.map(msg => msg.id === exists.id ? newMessage : msg);
               }
               return prev;
             }
@@ -345,44 +337,25 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
         }
       )
-      .subscribe((status, err) => {
-        console.log('Messages Postgres Channel Status:', status);
-        if (err) console.error('Messages Postgres Channel Error:', err);
-      });
-
-    // 3. Subscribe to Broadcast for Orders (Instant Soft Sync)
-    const syncChannel = supabase
-      .channel('orders-sync')
+      // 3. Broadcast: Instant Order Status Sync
       .on('broadcast', { event: 'order_status_sync' }, ({ payload }) => {
-        console.log('Broadcast Status Received:', payload);
+        console.log('Broadcast Order Sync:', payload);
         const { orderId, status } = payload;
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
       })
+      // 4. Broadcast: New Order Alert
       .on('broadcast', { event: 'new_order' }, () => {
-        console.log('Broadcast New Order Received!');
+        console.log('Broadcast New Order Alert!');
         fetchOrders();
       })
-      .subscribe((status, err) => {
-        console.log('Orders Sync Broadcast Channel Status:', status);
-        if (err) console.error('Orders Sync Broadcast Channel Error:', err);
-      });
-
-    // 4. Persistent Broadcast Channel for Messages (backup for instant sync)
-    const messagesSyncChannel = supabase
-      .channel('messages-broadcast-sync')
+      // 5. Broadcast: Instant Message Sync
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
-        console.log('🟢 Broadcast New Message Received!', payload);
+        console.log('Broadcast Message Received:', payload);
         const newMessage = payload as Message;
-
-        // Filtrar por customer_id se não for admin
-        if (user?.role !== 'admin' && newMessage.customerId !== user?.id) {
-          return;
-        }
+        if (user?.role !== 'admin' && newMessage.customerId !== user?.id) return;
 
         setMessages(prev => {
-          // Evitar duplicatas
           if (prev.find(m => m.id === newMessage.id)) return prev;
-          // Também verificar mensagens temporárias
           const tempMatch = prev.find(m =>
             m.id.startsWith('temp-') &&
             m.text === newMessage.text &&
@@ -395,33 +368,35 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
       })
       .subscribe((status, err) => {
-        console.log('Messages Broadcast Channel Status:', status);
-        if (err) console.error('Messages Broadcast Channel Error:', err);
+        console.log(`Global Channel '${channelName}' Status:`, status);
+        if (status === 'SUBSCRIBED') {
+          setIsRealtimeConnected(true);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setIsRealtimeConnected(false);
+          if (err) console.error('Realtime Error:', err);
+        }
       });
 
-    channelRef.current = syncChannel;
-    messageChannelRef.current = messagesSyncChannel;
+    channelRef.current = channel;
+    // We can use the same channel ref for message sending too, 
+    // but we'll adapt the sendMessage function to use this ref.
+    messageChannelRef.current = channel;
 
-    // 5. Fallback: Polling every 15s for messages (both admin and client when chat is active)
+    // Polling Intervals (Fallback)
     const messageInterval = setInterval(() => {
-      console.log('Message Polling Refresh...');
       fetchMessages();
     }, 15000);
 
-    // 6. Fallback: Polling every 30s for orders (admin only)
     let orderInterval: any = null;
     if (user?.role === 'admin') {
       orderInterval = setInterval(() => {
-        console.log('Admin Orders Polling Refresh...');
         fetchOrders();
       }, 30000);
     }
 
     return () => {
-      supabase.removeChannel(dbChannel);
-      supabase.removeChannel(msgChannel);
-      supabase.removeChannel(syncChannel);
-      supabase.removeChannel(messagesSyncChannel);
+      console.log('Cleaning up Realtime subscription...');
+      supabase.removeChannel(channel);
       channelRef.current = null;
       messageChannelRef.current = null;
       clearInterval(messageInterval);
