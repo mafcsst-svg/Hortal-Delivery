@@ -13,7 +13,6 @@ import { ProfileView } from './views/ProfileView';
 import { ChatView } from './views/ChatView';
 import { AdminView } from './views/AdminView';
 import { BottomNav } from './components/BottomNav';
-import { AuthTest } from './components/AuthTest';
 
 // Router Component to handle view switching
 const AppRouter = () => {
@@ -24,7 +23,6 @@ const AppRouter = () => {
 
   return (
     <div className="bg-stone-50 min-h-screen">
-      <AuthTest />
       {currentView === 'login' && <LoginView setCurrentView={setCurrentView} />}
       {currentView === 'shop' && <ShopView setCurrentView={setCurrentView} />}
       {currentView === 'cart' && <CartView setCurrentView={setCurrentView} />}
