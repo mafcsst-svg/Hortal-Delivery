@@ -16,7 +16,7 @@ import { supabase } from '../services/supabaseClient';
 export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user, updateUserProfile, allUsers, setAllUsers, settings, setSettings, logout } = useUser();
   const { products, setProducts } = useProducts();
-  const { orders, setOrders, messages, setMessages, refreshOrders, updateOrderStatus } = useOrder();
+  const { orders, setOrders, messages, setMessages, refreshOrders, updateOrderStatus, isRealtimeConnected } = useOrder();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'messages' | 'products' | 'settings' | 'analytics' | 'manual-order' | 'customers'>('orders');
   const [orderSubTab, setOrderSubTab] = useState<'active' | 'history'>('active');
@@ -494,7 +494,13 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
       )}
       <div className="bg-stone-900 text-white p-6 rounded-b-[30px] mb-6 shadow-2xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold flex items-center gap-2"><Settings className="text-brand-50" /> Admin</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold flex items-center gap-2"><Settings className="text-brand-50" /> Admin</h2>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isRealtimeConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              <span className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+              {isRealtimeConnected ? 'Online' : 'Offline'}
+            </div>
+          </div>
           <button onClick={logout} className="bg-stone-800 p-2 rounded-lg hover:bg-stone-700 transition-colors"><LogOut size={18} /></button>
         </div>
         <div className="flex gap-4 overflow-x-auto no-scrollbar">

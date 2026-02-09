@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { CartItem, Order, Message, Product, OrderStatus } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { useUser } from './UserContext';
@@ -17,9 +17,11 @@ interface OrderContextType {
   updateObservation: (id: string, obs: string) => void;
   clearCart: () => void;
   refreshOrders: () => Promise<void>;
+  refreshMessages: () => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   updateOrderRating: (orderId: string, rating: number, comment?: string, skipped?: boolean) => Promise<void>;
   sendMessage: (text: string, customerId?: string) => Promise<void>;
+  isRealtimeConnected: boolean;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -29,6 +31,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<any>(null);
+  const messageChannelRef = useRef<any>(null);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // Keep messages in localStorage for now
   const [messages, setMessages] = useState<Message[]>([]);
@@ -183,20 +187,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         setMessages(prev => prev.map(m => m.id === optimisticId ? realMessage : m));
 
-        // Broadcast instantâneo para notificar outros (especialmente admin)
-        const broadcastChannel = supabase.channel('messages-sync');
-        broadcastChannel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await broadcastChannel.send({
+        // Broadcast instantâneo usando canal persistente
+        if (messageChannelRef.current) {
+          try {
+            await messageChannelRef.current.send({
               type: 'broadcast',
               event: 'new_message',
               payload: realMessage
             });
-            console.log('Message Broadcast Sent:', realMessage.text);
-            // Cleanup after sending
-            setTimeout(() => supabase.removeChannel(broadcastChannel), 1000);
+            console.log('Message Broadcast Sent via persistent channel:', realMessage.text);
+          } catch (broadcastErr) {
+            console.warn('Broadcast failed, relying on postgres_changes:', broadcastErr);
           }
-        });
+        }
       }
     } catch (err) {
       console.error('Error sending message:', err);
@@ -210,7 +213,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchOrders();
     fetchMessages();
 
-    // 1. Subscribe to Postgres Changes (DB backup)
+    // 1. Subscribe to Postgres Changes for Orders
     const dbChannel = supabase
       .channel('db-orders')
       .on(
@@ -234,11 +237,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Orders Realtime Channel Status:', status);
+        if (status === 'SUBSCRIBED') setIsRealtimeConnected(true);
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setIsRealtimeConnected(false);
+      });
 
-    // 2. Subscribe to Messages Changes
+    // 2. Subscribe to Messages Changes via postgres_changes (REALTIME PRIMARY)
     const msgChannel = supabase
-      .channel('db-messages')
+      .channel('db-messages-realtime')
       .on(
         'postgres_changes',
         {
@@ -247,8 +254,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           table: 'messages'
         },
         (payload) => {
-          console.log('Postgres Change Message:', payload.new);
-          const m = payload.new;
+          console.log('🔴 Postgres Realtime Message INSERT:', payload.new);
+          const m = payload.new as any;
+
+          // Filtrar por customer_id se não for admin
+          if (user?.role !== 'admin' && m.customer_id !== user?.id) {
+            return;
+          }
+
           const newMessage: Message = {
             id: m.id,
             senderId: m.sender_id,
@@ -261,14 +274,29 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
 
           setMessages(prev => {
-            if (prev.find(existing => existing.id === newMessage.id)) return prev;
+            // Evitar duplicatas (pode já ter sido adicionada como mensagem otimista)
+            const exists = prev.find(existing =>
+              existing.id === newMessage.id ||
+              (existing.id.startsWith('temp-') &&
+                existing.text === newMessage.text &&
+                existing.senderId === newMessage.senderId)
+            );
+            if (exists) {
+              // Substituir mensagem temporária pela real
+              if (exists.id.startsWith('temp-')) {
+                return prev.map(m => m.id === exists.id ? newMessage : m);
+              }
+              return prev;
+            }
             return [...prev, newMessage];
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Messages Realtime Channel Status:', status);
+      });
 
-    // 3. Subscribe to Broadcast (Instant Soft Sync)
+    // 3. Subscribe to Broadcast for Orders (Instant Soft Sync)
     const syncChannel = supabase
       .channel('orders-sync')
       .on('broadcast', { event: 'order_status_sync' }, ({ payload }) => {
@@ -282,27 +310,51 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
       .subscribe();
 
-    // 4. Subscribe to Broadcast for Messages (Instant Notifications)
+    // 4. Persistent Broadcast Channel for Messages (backup for instant sync)
     const messagesSyncChannel = supabase
-      .channel('messages-sync')
+      .channel('messages-broadcast-sync')
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
-        console.log('Broadcast New Message Received!', payload);
+        console.log('🟢 Broadcast New Message Received!', payload);
         const newMessage = payload as Message;
+
+        // Filtrar por customer_id se não for admin
+        if (user?.role !== 'admin' && newMessage.customerId !== user?.id) {
+          return;
+        }
+
         setMessages(prev => {
           // Evitar duplicatas
           if (prev.find(m => m.id === newMessage.id)) return prev;
+          // Também verificar mensagens temporárias
+          const tempMatch = prev.find(m =>
+            m.id.startsWith('temp-') &&
+            m.text === newMessage.text &&
+            m.senderId === newMessage.senderId
+          );
+          if (tempMatch) {
+            return prev.map(m => m.id === tempMatch.id ? newMessage : m);
+          }
           return [...prev, newMessage];
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Messages Broadcast Channel Status:', status);
+      });
 
     channelRef.current = syncChannel;
+    messageChannelRef.current = messagesSyncChannel;
 
-    // 4. Fallback: Polling every 30s only for admin
-    let interval: any = null;
+    // 5. Fallback: Polling every 15s for messages (both admin and client when chat is active)
+    const messageInterval = setInterval(() => {
+      console.log('Message Polling Refresh...');
+      fetchMessages();
+    }, 15000);
+
+    // 6. Fallback: Polling every 30s for orders (admin only)
+    let orderInterval: any = null;
     if (user?.role === 'admin') {
-      interval = setInterval(() => {
-        console.log('Admin Polling Refresh...');
+      orderInterval = setInterval(() => {
+        console.log('Admin Orders Polling Refresh...');
         fetchOrders();
       }, 30000);
     }
@@ -313,7 +365,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       supabase.removeChannel(syncChannel);
       supabase.removeChannel(messagesSyncChannel);
       channelRef.current = null;
-      if (interval) clearInterval(interval);
+      messageChannelRef.current = null;
+      clearInterval(messageInterval);
+      if (orderInterval) clearInterval(orderInterval);
     };
   }, [user?.id, user?.role]);
 
@@ -398,9 +452,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       earnedCashback, setEarnedCashback,
       addToCart, updateCartQuantity, updateObservation, clearCart,
       refreshOrders: fetchOrders,
+      refreshMessages: fetchMessages,
       updateOrderStatus,
       updateOrderRating,
-      sendMessage
+      sendMessage,
+      isRealtimeConnected
     }}>
       {children}
     </OrderContext.Provider>
