@@ -234,15 +234,24 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
       };
 
       if (editingProduct.id) {
-        // Update existing product in Supabase if we had a products table
-        // For now, let's keep products in local state or extend Supabase
-        setProducts((prev) => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData } as Product : p));
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingProduct.id);
+        if (error) throw error;
       } else {
-        const newProduct = { id: Date.now().toString(), ...productData } as Product;
-        setProducts((prev) => [newProduct, ...prev]);
+        const newId = `PROD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        const { error } = await supabase
+          .from('products')
+          .insert({ id: newId, ...productData });
+        if (error) throw error;
       }
+
       setEditingProduct({ category: 'panificacao', active: true });
       alert("Produto salvo com sucesso!");
+    } catch (err: any) {
+      console.error('Error saving product:', err);
+      alert('Erro ao salvar produto: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -252,8 +261,20 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
     setEditingProduct({ category: 'panificacao', active: true });
   }
 
-  const toggleProductActive = (id: string) => {
-    setProducts((prev) => prev.map(p => p.id === id ? { ...p, active: !p.active } : p));
+  const toggleProductActive = async (id: string) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ active: !product.active })
+        .eq('id', id);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('Error toggling product:', err);
+      alert('Erro ao alterar status do produto');
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
