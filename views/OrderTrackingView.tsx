@@ -62,8 +62,21 @@ export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: View
       refreshOrders();
    }, []);
 
-   const activeOrders = orders.filter((o: Order) => !o.ratingSkipped && o.status !== 'cancelled' && (o.status !== 'completed' || (o.status === 'completed' && !o.rating))).reverse();
-   const currentOrder = activeOrders[0];
+   const getRelevantOrder = () => {
+      // 1. Try to find an in-progress order (received, preparing, delivery)
+      const processingOrder = orders.find((o: Order) =>
+         ['received', 'preparing', 'delivery'].includes(o.status)
+      );
+      if (processingOrder) return processingOrder;
+
+      // 2. If no in-progress, find the newest completed order that hasn't been rated or skipped
+      const pendingRatingOrder = orders.find((o: Order) =>
+         o.status === 'completed' && !o.rating && !o.ratingSkipped
+      );
+      return pendingRatingOrder || null;
+   };
+
+   const currentOrder = getRelevantOrder();
    const [rating, setRating] = useState(0);
    const [comment, setComment] = useState('');
    const [showThankYou, setShowThankYou] = useState(false);
