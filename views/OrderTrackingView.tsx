@@ -178,7 +178,7 @@ export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: View
                      onClick={handleSkip}
                      className="w-full py-3 text-stone-400 text-sm font-bold hover:text-stone-600"
                   >
-                     Não quero avaliar agora
+                     Não quero avaliar
                   </button>
                </div>
             </div>
