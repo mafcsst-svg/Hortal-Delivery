@@ -51,10 +51,19 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
         }
       } else {
         console.log("Tentando login com:", formData.email);
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        console.log("Usando Supabase URL:", (supabase as any).supabaseUrl);
+
+        // Timeout de 15 segundos para evitar que fique travado para sempre
+        const loginPromise = supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout: O Supabase demorou demais para responder.')), 15000)
+        );
+
+        const { data, error: signInError } = await Promise.race([loginPromise, timeoutPromise]) as any;
         console.log("Resposta do Supabase Auth:", { data, signInError });
 
         if (signInError) throw signInError;

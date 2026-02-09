@@ -30,6 +30,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Fetch profile for the current authenticated user
   const fetchProfile = async (uid: string) => {
+    console.log('Buscando perfil para UID:', uid);
     try {
       const { data, error } = await supabase
         .from('profiles')
