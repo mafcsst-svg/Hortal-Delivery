@@ -32,7 +32,7 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
     try {
       if (isRegistering) {
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
           options: {
             data: {
@@ -51,11 +51,10 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
         }
       } else {
         console.log("Tentando login com:", formData.email);
-        console.log("Usando Supabase URL:", (supabase as any).supabaseUrl);
 
         // Timeout de 15 segundos para evitar que fique travado para sempre
         const loginPromise = supabase.auth.signInWithPassword({
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
         });
 
@@ -91,8 +90,8 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
   };
 
   return (
-    <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-between p-6 text-white relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+    <div className="min-h-[100dvh] bg-stone-900 flex flex-col items-center justify-between p-6 text-white relative overflow-y-auto">
+      <div className="fixed top-0 left-0 w-full h-full opacity-10 pointer-events-none">
         <div className="absolute top-[-20%] left-[-20%] w-[500px] h-[500px] bg-brand-500 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-20%] w-[500px] h-[500px] bg-blue-600 rounded-full blur-[120px]" />
       </div>
@@ -105,7 +104,7 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
         <X size={24} />
       </button>
 
-      <div className="z-10 w-full max-w-sm flex-1 flex flex-col justify-center">
+      <div className="z-10 w-full max-w-sm flex-1 flex flex-col justify-center my-10">
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-stone-800 rounded-2xl mx-auto flex items-center justify-center mb-6 border border-stone-700"><Store size={40} className="text-brand-500" /></div>
           <h1 className="text-3xl font-bold">{APP_NAME}</h1>
@@ -120,8 +119,23 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           )}
 
           {isRegistering && <Input placeholder="Nome Completo" icon={<UserIcon size={18} />} value={formData.name} onChange={(e: any) => setFormData({ ...formData, name: e.target.value })} />}
-          <Input placeholder="E-mail" type="email" icon={<Mail size={18} />} value={formData.email} onChange={(e: any) => setFormData({ ...formData, email: e.target.value })} />
-          <Input placeholder="Senha" type="password" icon={<Lock size={18} />} value={formData.password} onChange={(e: any) => setFormData({ ...formData, password: e.target.value })} />
+          <Input
+            placeholder="E-mail"
+            type="email"
+            icon={<Mail size={18} />}
+            value={formData.email}
+            onChange={(e: any) => setFormData({ ...formData, email: e.target.value })}
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="email"
+          />
+          <Input
+            placeholder="Senha"
+            type="password"
+            icon={<Lock size={18} />}
+            value={formData.password}
+            onChange={(e: any) => setFormData({ ...formData, password: e.target.value })}
+          />
 
           <Button type="submit" className="w-full mt-2 bg-brand-500 hover:bg-brand-600" isLoading={isLoading}>{isRegistering ? 'Cadastrar' : 'Entrar'}</Button>
         </form>
@@ -129,7 +143,7 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           {isRegistering ? 'Já tem conta? Entrar' : 'Não tem conta? Registre-se'}
         </button>
       </div>
-      <div className="z-10 w-full text-center py-6 mt-8 border-t border-stone-800/50 text-xs text-stone-500">
+      <div className="z-10 w-full text-center py-6 border-t border-stone-800/50 text-xs text-stone-500">
         Padaria Hortal<br />
         Rua Francisco de almeida, 218 - Jd Santo Antônio<br />
         Bebedouro SP<br />
