@@ -99,6 +99,14 @@ export const CartView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
       // 4. Cleanup and redirect
       setCart([]);
       setEarnedCashback(earned);
+
+      // Fast Sync: Notify Admin via Broadcast
+      await supabase.channel('schema-db-changes').send({
+        type: 'broadcast',
+        event: 'new_order',
+        payload: { orderId: orderData.id }
+      });
+
       await refreshOrders();
       setCurrentView('order-success');
     } catch (err: any) {

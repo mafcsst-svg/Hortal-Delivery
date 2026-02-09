@@ -128,6 +128,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { orderId, status } = payload;
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
       })
+      // NEW: Listen for new orders (client -> admin)
+      .on('broadcast', { event: 'new_order' }, () => {
+        console.log('New Order Broadcast Received! Fetching...');
+        fetchOrders();
+      })
       .subscribe();
 
     return () => {
