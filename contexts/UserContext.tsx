@@ -30,13 +30,23 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Fetch profile for the current authenticated user
   const fetchProfile = async (uid: string) => {
-    console.log('Buscando perfil para UID:', uid);
+    console.log('--- FETCH PROFILE START ---', { uid });
+
     try {
-      const { data, error } = await supabase
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', uid)
         .single();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+      );
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const { data, error } = response;
+
+      console.log('--- FETCH PROFILE RESPONSE ---', { hasData: !!data, hasError: !!error });
 
       if (error) {
         console.error('Error fetching profile:', error);
@@ -44,6 +54,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
+        console.log('--- FETCH PROFILE SUCCESS ---', { role: data.role });
         const mappedUser: User = {
           id: data.id,
           name: data.name || 'Cliente Hortal',
@@ -58,7 +69,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return mappedUser;
       }
     } catch (err) {
-      console.error('Unexpected error fetching profile:', err);
+      console.error('--- FETCH PROFILE HANG OR ERROR ---', err);
     }
     return null;
   };
@@ -94,22 +105,30 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sync Supabase Auth state with our global user context
   useEffect(() => {
+    console.log('--- AUTH SUBSCRIPTION START ---');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('--- AUTH EVENT ---', { event, hasSession: !!session, userId: session?.user?.id });
+
       if (session?.user) {
+        // Only fetch if we don't have a user or the ID changed
         const profile = await fetchProfile(session.user.id);
         if (profile) {
-          setUser({ ...profile, email: session.user.email || '' });
+          const fullUser = { ...profile, email: session.user.email || '' };
+          console.log('--- UPDATING GLOBAL USER ---', { id: fullUser.id, role: fullUser.role });
+          setUser(fullUser);
           if (profile.role === 'admin') {
             fetchAllUsers();
           }
         }
-      } else {
+      } else if (event === 'SIGNED_OUT' || !session) {
+        console.log('--- CLEARING USER STATE ---');
         setUser(null);
         setAllUsers([]);
       }
     });
 
     return () => {
+      console.log('--- AUTH SUBSCRIPTION CLEANUP ---');
       subscription.unsubscribe();
     };
   }, []);
