@@ -101,10 +101,18 @@ export const CartView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
       setEarnedCashback(earned);
 
       // Fast Sync: Notify Admin via Broadcast
-      await supabase.channel('schema-db-changes').send({
-        type: 'broadcast',
-        event: 'new_order',
-        payload: { orderId: orderData.id }
+      const syncChannel = supabase.channel('orders-sync');
+      syncChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await syncChannel.send({
+            type: 'broadcast',
+            event: 'new_order',
+            payload: { orderId: orderData.id }
+          });
+          console.log('Instant Order Broadcast Sent via orders-sync!');
+          // Cleanup ephemeral channel
+          setTimeout(() => supabase.removeChannel(syncChannel), 5000);
+        }
       });
 
       await refreshOrders();

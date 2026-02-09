@@ -92,9 +92,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     fetchOrders();
 
-    // Subscribe to real-time order changes
-    const channel = supabase
-      .channel('schema-db-changes')
+    // 1. Subscribe to Postgres Changes (DB backup)
+    const dbChannel = supabase
+      .channel('db-orders')
       .on(
         'postgres_changes',
         {
@@ -103,46 +103,42 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           table: 'orders'
         },
         (payload) => {
-          console.log('Realtime Order Change:', payload.eventType, payload.new);
-
-          if (payload.eventType === 'UPDATE') {
-            const updated = payload.new;
-            setOrders(prev => prev.map(o => o.id === updated.id ? {
-              ...o,
-              status: updated.status,
-              deliveryCode: updated.delivery_code || o.deliveryCode
-            } : o));
-
-            // If status is completed or cancelled, maybe fetch fresh to ensure cashback etc. is synced
-            if (updated.status === 'completed' || updated.status === 'cancelled') {
-              fetchOrders();
-            }
-          } else {
-            // For INSERT or DELETE, re-fetch is safer to get relations (items)
-            fetchOrders();
-          }
+          console.log('Postgres Change Order:', payload.eventType);
+          fetchOrders();
         }
       )
-      // Broadcast for ultra-fast "soft" sync (admin -> client)
+      .subscribe();
+
+    // 2. Subscribe to Broadcast (Instant Soft Sync)
+    const syncChannel = supabase
+      .channel('orders-sync')
       .on('broadcast', { event: 'order_status_sync' }, ({ payload }) => {
-        console.log('Broadcast Status Sync Received:', payload);
+        console.log('Broadcast Status Received:', payload);
         const { orderId, status } = payload;
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
       })
-      // NEW: Listen for new orders (client -> admin)
       .on('broadcast', { event: 'new_order' }, () => {
-        console.log('New Order Broadcast Received! Fetching...');
+        console.log('Broadcast New Order Received!');
         fetchOrders();
       })
-      .subscribe((status) => {
-        console.log('Realtime/Broadcast Channel Status:', status);
-      });
+      .subscribe();
 
-    channelRef.current = channel;
+    channelRef.current = syncChannel;
+
+    // 3. Fallback: Polling every 30s only for admin
+    let interval: any = null;
+    if (user?.role === 'admin') {
+      interval = setInterval(() => {
+        console.log('Admin Polling Refresh...');
+        fetchOrders();
+      }, 30000);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(dbChannel);
+      supabase.removeChannel(syncChannel);
       channelRef.current = null;
+      if (interval) clearInterval(interval);
     };
   }, [user?.id, user?.role]);
 
@@ -189,8 +185,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (error) throw error;
 
-      // Broadcast via the EXISTING stable channel if possible
-      const activeChannel = channelRef.current || supabase.channel('schema-db-changes');
+      // Broadcast via the EXISTING stable sync channel
+      const activeChannel = channelRef.current || supabase.channel('orders-sync');
 
       await activeChannel.send({
         type: 'broadcast',
