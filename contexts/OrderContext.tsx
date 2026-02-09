@@ -170,7 +170,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Substituir mensagem otimista pela mensagem real do banco
       if (data) {
-        setMessages(prev => prev.map(m => m.id === optimisticId ? {
+        const realMessage: Message = {
           id: data.id,
           senderId: data.sender_id,
           senderName: data.sender_name,
@@ -179,7 +179,24 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           timestamp: new Date(data.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isAdmin: data.is_admin,
           createdAt: data.created_at
-        } : m));
+        };
+
+        setMessages(prev => prev.map(m => m.id === optimisticId ? realMessage : m));
+
+        // Broadcast instantâneo para notificar outros (especialmente admin)
+        const broadcastChannel = supabase.channel('messages-sync');
+        broadcastChannel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await broadcastChannel.send({
+              type: 'broadcast',
+              event: 'new_message',
+              payload: realMessage
+            });
+            console.log('Message Broadcast Sent:', realMessage.text);
+            // Cleanup after sending
+            setTimeout(() => supabase.removeChannel(broadcastChannel), 1000);
+          }
+        });
       }
     } catch (err) {
       console.error('Error sending message:', err);
@@ -265,6 +282,20 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
       .subscribe();
 
+    // 4. Subscribe to Broadcast for Messages (Instant Notifications)
+    const messagesSyncChannel = supabase
+      .channel('messages-sync')
+      .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+        console.log('Broadcast New Message Received!', payload);
+        const newMessage = payload as Message;
+        setMessages(prev => {
+          // Evitar duplicatas
+          if (prev.find(m => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
+        });
+      })
+      .subscribe();
+
     channelRef.current = syncChannel;
 
     // 4. Fallback: Polling every 30s only for admin
@@ -280,6 +311,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       supabase.removeChannel(dbChannel);
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(syncChannel);
+      supabase.removeChannel(messagesSyncChannel);
       channelRef.current = null;
       if (interval) clearInterval(interval);
     };
