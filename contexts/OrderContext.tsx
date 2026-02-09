@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { CartItem, Order, Message, Product } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { useUser } from './UserContext';
@@ -26,6 +26,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { user } = useUser();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const channelRef = useRef<any>(null);
 
   // Keep messages in localStorage for now
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -124,7 +125,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       )
       // Broadcast for ultra-fast "soft" sync (admin -> client)
       .on('broadcast', { event: 'order_status_sync' }, ({ payload }) => {
-        console.log('Broadcast Sync Received:', payload);
+        console.log('Broadcast Status Sync Received:', payload);
         const { orderId, status } = payload;
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
       })
@@ -133,10 +134,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log('New Order Broadcast Received! Fetching...');
         fetchOrders();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime/Broadcast Channel Status:', status);
+      });
+
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [user?.id, user?.role]);
 
@@ -183,13 +189,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (error) throw error;
 
-      // Broadcast via the existing channel
-      const channel = supabase.channel('schema-db-changes');
-      await channel.send({
+      // Broadcast via the EXISTING stable channel if possible
+      const activeChannel = channelRef.current || supabase.channel('schema-db-changes');
+
+      await activeChannel.send({
         type: 'broadcast',
         event: 'order_status_sync',
         payload: { orderId, status: nextStatus }
       });
+
+      console.log('Instant Sync Broadcast Sent for:', nextStatus);
 
       await fetchOrders();
     } catch (err: any) {
