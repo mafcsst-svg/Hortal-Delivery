@@ -2,12 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --brand-50: #fdf8f4;
+    --brand-100: #f9ece0;
+    --brand-200: #f2d4bd;
+    --brand-300: #e7b38d;
+    --brand-400: #d98d5c;
+    --brand-500: #cc6d33;
+    --brand-600: #bc582d;
+    --brand-700: #9c4428;
+    --brand-800: #7e3926;
+    --brand-900: #663022;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-brand-800;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes soft-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+.animate-soft-fade {
+  animation: soft-fade 0.6s ease-in forwards;
 }

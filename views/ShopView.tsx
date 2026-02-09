@@ -79,39 +79,39 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
 
   return (
     <div className="h-screen flex flex-col bg-stone-50 pb-[80px]">
-      <div className="bg-white shadow-sm z-30 flex-shrink-0">
+      <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 flex-shrink-0 border-b border-stone-100 shadow-sm">
         <div className="p-4 pb-2 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-brand-500 w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand-100">
-              <Store size={24} />
+            <div className="bg-brand-500 w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-brand-100 rotate-3 transform hover:rotate-0 transition-transform duration-300">
+              <Store size={28} />
             </div>
             <div>
-              <h1 className="text-lg font-black text-stone-900 leading-none">{APP_NAME}</h1>
-              <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">{APP_SUBTITLE}</p>
+              <h1 className="text-xl font-black text-stone-900 leading-none tracking-tight">{APP_NAME}</h1>
+              <p className="text-[10px] text-brand-600 font-black uppercase tracking-[0.2em] mt-1">{APP_SUBTITLE}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('chat')}
-              className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-500 rounded-xl hover:bg-brand-100 transition-all border border-brand-100 shadow-sm font-bold text-xs active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-50 text-brand-700 rounded-2xl hover:bg-brand-100 transition-all border border-brand-100 shadow-sm font-bold text-xs active:scale-95"
             >
-              <MessageSquare size={16} /> <span className="hidden xs:inline">Ajuda</span>
+              <MessageSquare size={16} className="text-brand-500" /> <span className="hidden xs:inline">Chef Hortal</span>
             </button>
 
             {!user ? (
               <button
                 onClick={() => setCurrentView('login')}
-                className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors shadow-lg shadow-stone-200"
+                className="flex items-center gap-2 bg-stone-900 text-white px-5 py-2.5 rounded-2xl text-xs font-bold hover:bg-stone-800 transition-all shadow-lg shadow-stone-200 active:scale-95"
               >
                 <LogIn size={16} /> Entrar
               </button>
             ) : (
               <div className="flex items-center gap-2">
                 <div className="text-right hidden sm:block">
-                  <p className="text-[10px] font-bold text-stone-900 leading-none">{user.name}</p>
-                  <p className="text-[8px] text-stone-500 font-medium">{formatCurrency(user.cashbackBalance)}</p>
+                  <p className="text-[10px] font-black text-stone-900 leading-none">{user.name}</p>
+                  <p className="text-[8px] text-brand-600 font-bold">{formatCurrency(user.cashbackBalance)}</p>
                 </div>
-                <div className="w-9 h-9 bg-brand-50 rounded-xl flex items-center justify-center text-brand-500 font-black text-sm border border-brand-100">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-lg shadow-brand-100 border-2 border-white">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
               </div>
@@ -119,21 +119,21 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
           </div>
         </div>
 
-        <div className="px-4 py-2 bg-stone-50 flex items-center justify-between border-y border-stone-100">
+        <div className="px-4 py-2 bg-brand-50/50 flex items-center justify-between border-y border-brand-100/50">
           {user ? (
             <>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-stone-800">Olá, {user.name.split(' ')[0]}</span>
+                <span className="text-xs font-bold text-stone-800">Olá, <span className="text-brand-600 font-black">{user.name.split(' ')[0]}</span></span>
               </div>
-              <div className="flex items-center gap-1.5 bg-amber-100 text-amber-700 px-2 py-1 rounded-lg border border-amber-200 shadow-sm">
-                <Coins size={12} className="text-amber-500" />
-                <span className="text-[10px] font-black">{formatCurrency(user.cashbackBalance || 0)}</span>
+              <div className="flex items-center gap-1.5 bg-white text-brand-700 px-3 py-1.5 rounded-xl border border-brand-100 shadow-sm">
+                <Coins size={14} className="text-amber-500 fill-amber-500" />
+                <span className="text-[11px] font-black">{formatCurrency(user.cashbackBalance || 0)}</span>
               </div>
             </>
           ) : (
             <div className="flex items-center gap-2 w-full justify-between">
-              <span className="text-xs text-stone-500 italic">Bem-vindo(a) à nossa loja!</span>
-              <span className="text-[10px] bg-brand-50 text-brand-600 px-2 py-1 rounded-lg font-bold border border-brand-100">Login para cashback</span>
+              <span className="text-[11px] text-stone-500 font-medium">✨ Bem-vindo(a) à nossa padaria artesanal!</span>
+              <span className="text-[9px] bg-brand-500 text-white px-2.5 py-1 rounded-lg font-black uppercase tracking-wider">Cashback Ativado</span>
             </div>
           )}
         </div>
@@ -143,35 +143,68 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-brand-500 transition-colors" />
             <input
               type="text"
-              placeholder="O que você deseja pedir?"
-              className="w-full bg-stone-100 border border-transparent focus:border-brand-500 focus:bg-white rounded-xl py-3 pl-12 pr-4 outline-none text-sm font-medium transition-all"
+              placeholder="Encontre seu pão favorito..."
+              className="w-full bg-stone-100 border border-stone-200 focus:border-brand-400 focus:bg-white focus:ring-4 focus:ring-brand-50 rounded-2xl py-3.5 pl-12 pr-4 outline-none text-sm font-semibold transition-all shadow-inner"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 px-4 border-b border-stone-50">
+
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 px-4">
           {[
-            { id: 'all', label: 'Todos' },
-            { id: 'promocoes', label: 'Promoções' },
-            { id: 'panificacao', label: 'Panificação' },
-            { id: 'confeitaria', label: 'Confeitaria' },
-            { id: 'lanches', label: 'Lanches' },
-            { id: 'bebidas', label: 'Bebidas' },
-            { id: 'mercearia', label: 'Mercearia' }
+            { id: 'all', label: 'Início', emoji: '🏠' },
+            { id: 'promocoes', label: 'Ofertas', emoji: '🏷️' },
+            { id: 'panificacao', label: 'Pães', emoji: '🥖' },
+            { id: 'confeitaria', label: 'Doces', emoji: '🍰' },
+            { id: 'lanches', label: 'Lanches', emoji: '🍔' },
+            { id: 'bebidas', label: 'Bebidas', emoji: '☕' },
+            { id: 'mercearia', label: 'Outros', emoji: '🧀' }
           ].map(c => (
             <button
               key={c.id}
               onClick={() => setCategory(c.id as any)}
-              className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap font-black transition-all border ${category === c.id ? 'bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-100' : 'bg-white text-stone-500 border-stone-200 hover:border-brand-200'}`}
+              className={`px-5 py-2.5 rounded-2xl text-xs whitespace-nowrap font-black transition-all border-2 flex items-center gap-2 ${category === c.id ? 'bg-brand-500 text-white border-brand-500 shadow-lg shadow-brand-100 -translate-y-0.5' : 'bg-white text-stone-500 border-stone-100 hover:border-brand-200 hover:bg-stone-50'}`}
             >
+              <span>{c.emoji}</span>
               {c.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 w-full bg-stone-50 overflow-y-auto pt-2 pb-32">
+      <div className="flex-1 w-full bg-stone-50 overflow-y-auto pt-4 pb-40">
+        {category === 'all' && searchTerm === '' && (
+          <div className="px-4 mb-8">
+            <div className="bg-gradient-to-br from-stone-900 to-stone-800 rounded-[2rem] p-6 relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+              <div className="relative z-10">
+                <span className="text-brand-400 text-[10px] font-black uppercase tracking-[0.3em]">Destaque do Dia</span>
+                <h2 className="text-white text-2xl font-black mt-2 leading-tight">Sugestão do <br />Chef Hortal 👨‍🍳</h2>
+                <p className="text-stone-400 text-sm mt-3 leading-relaxed max-w-[200px]">Experimente nosso Pão Italiano Rústico, fornada fresquinha saindo agora.</p>
+                <button
+                  onClick={() => setCategory('panificacao')}
+                  className="mt-6 bg-brand-500 text-white px-6 py-3 rounded-2xl font-black text-xs hover:bg-brand-600 transition-all active:scale-95 shadow-lg shadow-brand-500/30"
+                >
+                  Ver todos os pães
+                </button>
+              </div>
+              <div className="absolute bottom-0 right-0 w-48 h-48 opacity-20 pointer-events-none">
+                <Store size={180} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="px-4 mb-4 flex items-center justify-between">
+          <h2 className="font-black text-stone-900 text-lg">
+            {category === 'all' ? 'Nossos Produtos' : 'Explorando Categoria'}
+          </h2>
+          <span className="text-[10px] font-black text-brand-600 bg-brand-50 px-2 py-1 rounded-lg border border-brand-100 uppercase tracking-widest">
+            {filteredProducts.length} Itens
+          </span>
+        </div>
+
         {filteredProducts.map((product) => (
           <ProductRow
             key={product.id}
@@ -185,37 +218,45 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
       </div>
 
       {cart.length > 0 && (
-        <div className="fixed bottom-[70px] left-0 w-full px-4 z-40">
+        <div className="fixed bottom-[85px] left-0 w-full px-4 z-40">
           <button
             onClick={() => setCurrentView('cart')}
-            className="w-full bg-brand-500 text-white p-4 rounded-2xl shadow-xl flex justify-between items-center font-bold active:scale-95 transition-all hover:bg-brand-600 animate-slide-up"
+            className="w-full bg-stone-900 text-white p-5 rounded-[2rem] shadow-2xl flex justify-between items-center font-bold active:scale-95 transition-all hover:bg-stone-800 animate-slide-up border border-stone-800"
           >
-            <div className="flex items-center gap-3">
-              <div className="bg-brand-600 w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black border border-brand-400">
+            <div className="flex items-center gap-4">
+              <div className="bg-brand-500 w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-black border-2 border-stone-900 text-white">
                 {cartItemCount}
               </div>
-              <span className="text-base">Ver Cesta</span>
+              <div>
+                <span className="text-base font-black block leading-none">Minha Cesta</span>
+                <span className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Finalizar Pedido</span>
+              </div>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-lg leading-none">{formatCurrency(cartTotal)}</span>
-              <span className="text-[10px] text-brand-100 font-medium">Finalizar Pedido</span>
+              <span className="text-xl font-black text-brand-400">{formatCurrency(cartTotal)}</span>
             </div>
           </button>
         </div>
       )}
 
-      {/* Support FAB */}
-      <div className="fixed bottom-24 right-6 z-40">
+      {/* Chef Hortal FAB */}
+      <div className="fixed bottom-28 right-6 z-40">
         <button
           onClick={() => setCurrentView('chat')}
-          className="group flex items-center gap-2 bg-brand-500 text-white p-4 rounded-full shadow-2xl hover:bg-brand-600 transition-all active:scale-95 animate-fade-in border-4 border-white"
+          className="group flex items-center gap-3 bg-brand-500 text-white p-4.5 rounded-full shadow-2xl hover:bg-brand-600 transition-all active:scale-95 animate-soft-fade border-4 border-white overflow-hidden"
         >
-          <MessageSquare size={24} />
-          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 font-bold whitespace-nowrap">
-            Precisa de ajuda?
+          <div className="relative">
+            <MessageSquare size={26} />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-brand-500 animate-pulse"></div>
+          </div>
+          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 font-black text-sm whitespace-nowrap">
+            Falar com Chef Hortal
           </span>
         </button>
       </div>
     </div>
+  );
+};
+    </div >
   );
 };

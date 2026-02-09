@@ -25,7 +25,7 @@ export const BottomNav = ({ currentView, setCurrentView }: BottomNavProps) => {
   const navItems = [
     { id: 'shop', label: 'Início', icon: Store },
     { id: 'order-tracking', label: 'Pedidos', icon: ClipboardList, badge: activeOrdersCount },
-    { id: 'chat', label: 'Ajuda', icon: MessageSquare },
+    { id: 'chat', label: 'Chef Hortal', icon: MessageSquare },
     { id: 'profile', label: 'Perfil', icon: User },
   ];
 

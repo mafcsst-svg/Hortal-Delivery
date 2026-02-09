@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { CartItem, Order, Message, Product, OrderStatus } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { useUser } from './UserContext';
+import { useProducts } from './ProductContext';
+import { chatWithChefHortal } from '../services/geminiService';
 
 interface OrderContextType {
   cart: CartItem[];
@@ -28,6 +30,7 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useUser();
+  const { products } = useProducts();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<any>(null);
@@ -186,6 +189,48 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
 
         setMessages(prev => prev.map(m => m.id === optimisticId ? realMessage : m));
+
+        // --- NEW: AI RESPONSE LOGIC ---
+        // If it's a customer sending a message and it's not an admin reply
+        if (user.role !== 'admin') {
+          try {
+            const aiResponseText = await chatWithChefHortal(text, products);
+
+            // Insert AI message into database
+            const { data: aiData, error: aiError } = await supabase.from('messages').insert({
+              sender_id: 'chef-hortal-ai',
+              customer_id: user.id,
+              text: aiResponseText,
+              is_admin: true,
+              sender_name: 'Chef Hortal 🥖'
+            }).select().single();
+
+            if (!aiError && aiData) {
+              const aiMessage: Message = {
+                id: aiData.id,
+                senderId: aiData.sender_id,
+                senderName: aiData.sender_name,
+                customerId: aiData.customer_id,
+                text: aiData.text,
+                timestamp: new Date(aiData.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                isAdmin: true,
+                createdAt: aiData.created_at
+              };
+
+              // Broadcast AI message
+              if (messageChannelRef.current) {
+                await messageChannelRef.current.send({
+                  type: 'broadcast',
+                  event: 'new_message',
+                  payload: aiMessage
+                });
+              }
+            }
+          } catch (aiErr) {
+            console.error('Error triggering Chef Hortal AI:', aiErr);
+          }
+        }
+        // --- END AI RESPONSE LOGIC ---
 
         // Broadcast instantâneo usando canal persistente
         if (messageChannelRef.current) {
