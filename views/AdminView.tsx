@@ -117,6 +117,14 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
 
       console.log('Status atualizado com sucesso no DB.');
 
+      // Ultra-fast Broadcast sync
+      await supabase.channel('schema-db-changes').send({
+        type: 'broadcast',
+        event: 'order_status_sync',
+        payload: { orderId, status: nextStatus }
+      });
+      console.log('Broadcast sincronizado.');
+
       // Manual refresh as backup for realtime
       await refreshOrders();
     } catch (err: any) {

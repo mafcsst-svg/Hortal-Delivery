@@ -100,10 +100,33 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           schema: 'public',
           table: 'orders'
         },
-        () => {
-          fetchOrders();
+        (payload) => {
+          console.log('Realtime Order Change:', payload.eventType, payload.new);
+
+          if (payload.eventType === 'UPDATE') {
+            const updated = payload.new;
+            setOrders(prev => prev.map(o => o.id === updated.id ? {
+              ...o,
+              status: updated.status,
+              deliveryCode: updated.delivery_code || o.deliveryCode
+            } : o));
+
+            // If status is completed or cancelled, maybe fetch fresh to ensure cashback etc. is synced
+            if (updated.status === 'completed' || updated.status === 'cancelled') {
+              fetchOrders();
+            }
+          } else {
+            // For INSERT or DELETE, re-fetch is safer to get relations (items)
+            fetchOrders();
+          }
         }
       )
+      // Broadcast for ultra-fast "soft" sync (admin -> client)
+      .on('broadcast', { event: 'order_status_sync' }, ({ payload }) => {
+        console.log('Broadcast Sync Received:', payload);
+        const { orderId, status } = payload;
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+      })
       .subscribe();
 
     return () => {
