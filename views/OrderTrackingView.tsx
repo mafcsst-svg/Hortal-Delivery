@@ -69,11 +69,14 @@ export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: View
       );
       if (processingOrder) return processingOrder;
 
-      // 2. If no in-progress, find the newest completed order that hasn't been rated or skipped
-      const pendingRatingOrder = orders.find((o: Order) =>
-         o.status === 'completed' && !o.rating && !o.ratingSkipped
-      );
-      return pendingRatingOrder || null;
+      // 2. If no in-progress, only consider the absolute newest completed order for rating
+      const latestCompleted = orders.find((o: Order) => o.status === 'completed');
+
+      if (latestCompleted && !latestCompleted.rating && !latestCompleted.ratingSkipped) {
+         return latestCompleted;
+      }
+
+      return null;
    };
 
    const currentOrder = getRelevantOrder();
