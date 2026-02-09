@@ -20,7 +20,7 @@ const AppRouter = () => {
   const { earnedCashback } = useOrder();
   const { isLoading } = useUser();
 
-  const showBottomNav = ['shop', 'order-tracking', 'profile', 'chat'].includes(currentView);
+  const showBottomNav = ['shop', 'order-tracking', 'profile', 'chat', 'cart', 'order-success'].includes(currentView);
 
   if (isLoading) {
     return (

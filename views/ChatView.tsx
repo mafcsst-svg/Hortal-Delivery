@@ -29,7 +29,7 @@ export const ChatView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
   const userMessages = messages.filter((m) => m.customerId === user?.id);
 
   return (
-    <div className="flex flex-col h-screen bg-stone-50">
+    <div className="flex flex-col h-screen bg-stone-50 pb-20">
       <div className="bg-white p-4 shadow-sm flex items-center gap-3">
         <button onClick={() => setCurrentView('shop')} className="p-2 hover:bg-stone-100 rounded-full">
           <ChevronLeft size={24} className="text-stone-600" />

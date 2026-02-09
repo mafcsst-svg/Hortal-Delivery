@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, XCircle, Heart, Star, ClipboardList, Clock, Navigation, CheckCircle2, ChevronLeft, ArrowRight, Coins, PartyPopper } from 'lucide-react';
+import { Package, XCircle, Heart, Star, ClipboardList, Clock, Navigation, CheckCircle2, ChevronLeft, ArrowRight, Coins, PartyPopper, MessageSquare } from 'lucide-react';
 import { Button } from '../components/UI';
 import { useOrder } from '../contexts/OrderContext';
 import { Order, OrderStatus, ViewState, CartItem } from '../types';
@@ -226,6 +226,9 @@ export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: View
                </button>
                <h1 className="text-lg font-bold text-stone-800">Acompanhar Pedido</h1>
             </div>
+            <button onClick={() => setCurrentView('chat')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 text-brand-600 rounded-full text-xs font-bold transition-all active:scale-95 shadow-sm border border-brand-100">
+               <MessageSquare size={14} /> Ajuda
+            </button>
          </div>
 
          <div className="p-4 space-y-6">
