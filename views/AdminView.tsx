@@ -102,15 +102,27 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
   };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: OrderStatus) => {
+    console.log('Tentando atualizar pedido para status:', nextStatus);
+
+    // Optimistic update
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+
     try {
       const { error } = await supabase
         .from('orders')
         .update({ status: nextStatus })
         .eq('id', orderId);
+
       if (error) throw error;
-      // Real-time listener in OrderContext will handle the state update
+
+      console.log('Status atualizado com sucesso no DB.');
+
+      // Manual refresh as backup for realtime
+      await refreshOrders();
     } catch (err: any) {
       console.error('Error updating status:', err);
+      // Rollback on error
+      await refreshOrders();
       alert('Erro ao atualizar status: ' + err.message);
     }
   };
