@@ -24,7 +24,17 @@ export interface User {
   orderHistory: Order[];
 }
 
-export type ProductCategory = 'panificacao' | 'confeitaria' | 'lanches' | 'promocoes' | 'bebidas' | 'mercearia';
+
+export interface Category {
+  id: string;
+  name: string;
+  emoji: string;
+  display_order: number;
+  active: boolean;
+}
+
+export type ProductCategory = string;
+
 
 export interface Product {
   id: string;

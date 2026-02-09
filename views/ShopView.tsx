@@ -148,7 +148,7 @@ const ChefSuggestionBanner = ({ setCategory }: { setCategory: (c: any) => void }
 
 export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user } = useUser();
-  const { products } = useProducts();
+  const { products, categories } = useProducts();
   const { cart, addToCart, updateCartQuantity, updateObservation } = useOrder();
 
   const [category, setCategory] = useState<ProductCategory | 'all'>('all');
@@ -243,24 +243,24 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 px-4">
-          {[
-            { id: 'all', label: 'Início', emoji: '🏠' },
-            { id: 'promocoes', label: 'Ofertas', emoji: '🏷️' },
-            { id: 'panificacao', label: 'Pães', emoji: '🥖' },
-            { id: 'confeitaria', label: 'Doces', emoji: '🍰' },
-            { id: 'lanches', label: 'Lanches', emoji: '🍔' },
-            { id: 'bebidas', label: 'Bebidas', emoji: '☕' },
-            { id: 'mercearia', label: 'Outros', emoji: '🧀' }
-          ].map(c => (
+          {categories.filter(c => c.active).map(c => (
             <button
               key={c.id}
-              onClick={() => setCategory(c.id as any)}
+              onClick={() => setCategory(c.id)}
               className={`px-5 py-2.5 rounded-2xl text-xs whitespace-nowrap font-black transition-all border-2 flex items-center gap-2 ${category === c.id ? 'bg-brand-500 text-white border-brand-500 shadow-lg shadow-brand-100 -translate-y-0.5' : 'bg-white text-stone-500 border-stone-100 hover:border-brand-200 hover:bg-stone-50'}`}
             >
               <span>{c.emoji}</span>
-              {c.label}
+              {c.name}
             </button>
           ))}
+          <button
+            key="all"
+            onClick={() => setCategory('all')}
+            className={`px-5 py-2.5 rounded-2xl text-xs whitespace-nowrap font-black transition-all border-2 flex items-center gap-2 ${category === 'all' ? 'bg-brand-500 text-white border-brand-500 shadow-lg shadow-brand-100 -translate-y-0.5' : 'bg-white text-stone-500 border-stone-100 hover:border-brand-200 hover:bg-stone-50'}`}
+          >
+            <span>🏠</span>
+            Início
+          </button>
         </div>
       </div>
 

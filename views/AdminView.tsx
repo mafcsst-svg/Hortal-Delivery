@@ -15,10 +15,12 @@ import { supabase } from '../services/supabaseClient';
 
 export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user, updateUserProfile, allUsers, setAllUsers, settings, setSettings, logout } = useUser();
-  const { products, setProducts } = useProducts();
+  const { products, setProducts, categories, refreshCategories } = useProducts();
+  const [editingCategory, setEditingCategory] = useState<{ id?: string, name: string, emoji: string, display_order: number, active: boolean }>({ name: '', emoji: '', display_order: 0, active: true });
+
   const { orders, setOrders, messages, setMessages, refreshOrders, updateOrderStatus, isRealtimeConnected } = useOrder();
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'messages' | 'products' | 'settings' | 'analytics' | 'manual-order' | 'customers'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'messages' | 'products' | 'categories' | 'settings' | 'analytics' | 'manual-order' | 'customers'>('orders');
   const [orderSubTab, setOrderSubTab] = useState<'active' | 'history'>('active');
   const [selectedUserChat, setSelectedUserChat] = useState<string | null>(null);
   const [adminInput, setAdminInput] = useState('');
@@ -54,14 +56,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
 
   const paymentMap: Record<string, string> = { pix: 'Pix', money: 'Dinheiro', card: 'Cartão' };
 
-  const categories: { id: ProductCategory, label: string }[] = [
-    { id: 'panificacao', label: 'Panificação' },
-    { id: 'confeitaria', label: 'Confeitaria' },
-    { id: 'lanches', label: 'Lanches' },
-    { id: 'bebidas', label: 'Bebidas' },
-    { id: 'promocoes', label: 'Promoções' },
-    { id: 'mercearia', label: 'Mercearia' }
-  ];
+
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
@@ -337,6 +332,45 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
       reader.readAsDataURL(file);
     }
   };
+  const handleSaveCategory = async () => {
+    if (!editingCategory.name) return;
+    setIsLoading(true);
+    try {
+      if (editingCategory.id) {
+        const { error } = await supabase
+          .from('categories')
+          .update(editingCategory)
+          .eq('id', editingCategory.id);
+        if (error) throw error;
+      } else {
+        const newId = editingCategory.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-');
+        const { error } = await supabase
+          .from('categories')
+          .insert({ ...editingCategory, id: newId });
+        if (error) throw error;
+      }
+      setEditingCategory({ name: '', emoji: '', display_order: 0, active: true });
+      await refreshCategories();
+      alert("Categoria salva com sucesso!");
+    } catch (err: any) {
+      console.error('Error saving category:', err);
+      alert('Erro ao salvar categoria: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!window.confirm("Tem certeza que deseja excluir esta categoria?")) return;
+    try {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) throw error;
+      await refreshCategories();
+    } catch (err: any) {
+      alert('Erro ao excluir categoria: ' + err.message);
+    }
+  };
+
 
   const addManualItem = (product: Product) => {
     setManualOrderItems(prev => {
@@ -510,6 +544,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
             { id: 'customers', label: 'Clientes', icon: <Users size={16} /> },
             { id: 'messages', label: 'Mensagens', icon: <MessageSquare size={16} /> },
             { id: 'products', label: 'Estoque', icon: <UtensilsCrossed size={16} /> },
+            { id: 'categories', label: 'Categorias', icon: <AlignLeft size={16} /> },
             { id: 'settings', label: 'Configurações', icon: <Settings size={16} /> }
           ].map((tab) => (
             <button
@@ -724,7 +759,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
                 />
               </div>
               <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-                {products.filter(p => p.name.toLowerCase().includes(manualProductSearch.toLowerCase())).map(p => (
+                {products.filter(p => p.name.toLowerCase().includes(manualProductSearch.toLowerCase()) && p.active).map(p => (
                   <div key={p.id} className="flex justify-between items-center p-2 hover:bg-stone-50 rounded-lg border border-transparent hover:border-stone-100 transition-all cursor-pointer" onClick={() => addManualItem(p)}>
                     <div className="flex items-center gap-2">
                       <img src={p.image} className="w-8 h-8 rounded bg-stone-200 object-cover" />

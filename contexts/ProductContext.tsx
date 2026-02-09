@@ -1,17 +1,35 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product } from '../types';
+import { Product, Category } from '../types';
 import { INITIAL_PRODUCTS } from '../constants';
 import { supabase } from '../services/supabaseClient';
 
 interface ProductContextType {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
+  categories: Category[];
+  refreshCategories: () => Promise<void>;
 }
+
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('display_order');
+
+      if (error) throw error;
+      if (data) setCategories(data);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -37,6 +55,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
 
     const channel = supabase
       .channel('products-realtime')
@@ -56,7 +75,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   return (
-    <ProductContext.Provider value={{ products, setProducts }}>
+    <ProductContext.Provider value={{ products, setProducts, categories, refreshCategories: fetchCategories }}>
       {children}
     </ProductContext.Provider>
   );
