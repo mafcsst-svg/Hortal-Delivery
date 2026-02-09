@@ -4,6 +4,7 @@ import { supabase } from '../services/supabaseClient';
 
 interface UserContextType {
   user: User | null;
+  isLoading: boolean;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   allUsers: User[];
   setAllUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -17,6 +18,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const [settings, setSettings] = useState(() => {
@@ -105,30 +107,44 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sync Supabase Auth state with our global user context
   useEffect(() => {
-    console.log('--- AUTH SUBSCRIPTION START ---');
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('--- AUTH EVENT ---', { event, hasSession: !!session, userId: session?.user?.id });
+    console.log('--- AUTH INITIALIZATION START ---');
 
-      if (session?.user) {
-        // Only fetch if we don't have a user or the ID changed
-        const profile = await fetchProfile(session.user.id);
-        if (profile) {
-          const fullUser = { ...profile, email: session.user.email || '' };
-          console.log('--- UPDATING GLOBAL USER ---', { id: fullUser.id, role: fullUser.role });
-          setUser(fullUser);
-          if (profile.role === 'admin') {
-            fetchAllUsers();
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          if (profile) {
+            setUser({ ...profile, email: session.user.email || '' });
+            if (profile.role === 'admin') fetchAllUsers();
           }
         }
-      } else if (event === 'SIGNED_OUT' || !session) {
-        console.log('--- CLEARING USER STATE ---');
+      } catch (err) {
+        console.error('Session restoration error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('--- AUTH EVENT ---', { event, hasSession: !!session });
+
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        if (profile) {
+          setUser({ ...profile, email: session.user.email || '' });
+          if (profile.role === 'admin') fetchAllUsers();
+        }
+      } else {
         setUser(null);
         setAllUsers([]);
       }
+      setIsLoading(false);
     });
 
     return () => {
-      console.log('--- AUTH SUBSCRIPTION CLEANUP ---');
       subscription.unsubscribe();
     };
   }, []);
@@ -165,7 +181,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <UserContext.Provider value={{
-      user, setUser,
+      user, isLoading, setUser,
       allUsers, setAllUsers,
       settings, setSettings,
       updateUserProfile,
