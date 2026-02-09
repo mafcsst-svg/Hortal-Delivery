@@ -1,0 +1,7 @@
+{
+  "name": "Padaria Hortal",
+  "description": "Uma experiência completa de e-commerce mobile-first para panificadoras e mercados gourmet. Inclui gestão de produtos, pedidos, sistema de fidelidade com cashback e assistente de conteúdo IA para lojistas.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
