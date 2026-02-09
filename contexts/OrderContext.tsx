@@ -282,10 +282,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         console.log('Orders Realtime Channel Status:', status);
-        if (status === 'SUBSCRIBED') setIsRealtimeConnected(true);
-        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setIsRealtimeConnected(false);
+        if (err) console.error('Orders Realtime Channel Error:', err);
+
+        if (status === 'SUBSCRIBED') {
+          setIsRealtimeConnected(true);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setIsRealtimeConnected(false);
+          if (status === 'TIMED_OUT') {
+            console.warn('Realtime connection timed out, check network or Supabase state.');
+          }
+        }
       });
 
     // 2. Subscribe to Messages Changes via postgres_changes (REALTIME PRIMARY)
@@ -337,8 +345,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
         }
       )
-      .subscribe((status) => {
-        console.log('Messages Realtime Channel Status:', status);
+      .subscribe((status, err) => {
+        console.log('Messages Postgres Channel Status:', status);
+        if (err) console.error('Messages Postgres Channel Error:', err);
       });
 
     // 3. Subscribe to Broadcast for Orders (Instant Soft Sync)
@@ -353,7 +362,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log('Broadcast New Order Received!');
         fetchOrders();
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('Orders Sync Broadcast Channel Status:', status);
+        if (err) console.error('Orders Sync Broadcast Channel Error:', err);
+      });
 
     // 4. Persistent Broadcast Channel for Messages (backup for instant sync)
     const messagesSyncChannel = supabase
@@ -382,8 +394,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return [...prev, newMessage];
         });
       })
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         console.log('Messages Broadcast Channel Status:', status);
+        if (err) console.error('Messages Broadcast Channel Error:', err);
       });
 
     channelRef.current = syncChannel;
