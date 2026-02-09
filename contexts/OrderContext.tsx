@@ -140,17 +140,51 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const sendMessage = async (text: string, customerId?: string) => {
     if (!user) return;
     const targetCustomerId = customerId || user.id;
+
+    // Criar mensagem otimista para exibição imediata
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      senderId: user.id,
+      senderName: user.role === 'admin' ? 'Padaria Hortal' : user.name,
+      customerId: targetCustomerId,
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isAdmin: user.role === 'admin',
+      createdAt: new Date().toISOString()
+    };
+
+    // Adicionar mensagem imediatamente na UI
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
-      const { error } = await supabase.from('messages').insert({
+      const { data, error } = await supabase.from('messages').insert({
         sender_id: user.id,
         customer_id: targetCustomerId,
         text,
         is_admin: user.role === 'admin',
         sender_name: user.role === 'admin' ? 'Padaria Hortal' : user.name
-      });
+      }).select().single();
+
       if (error) throw error;
+
+      // Substituir mensagem otimista pela mensagem real do banco
+      if (data) {
+        setMessages(prev => prev.map(m => m.id === optimisticId ? {
+          id: data.id,
+          senderId: data.sender_id,
+          senderName: data.sender_name,
+          customerId: data.customer_id,
+          text: data.text,
+          timestamp: new Date(data.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isAdmin: data.is_admin,
+          createdAt: data.created_at
+        } : m));
+      }
     } catch (err) {
       console.error('Error sending message:', err);
+      // Remover mensagem otimista em caso de erro
+      setMessages(prev => prev.filter(m => m.id !== optimisticId));
       throw err;
     }
   };
