@@ -55,6 +55,97 @@ const ProductRow = ({ product, cart, addToCart, updateCartQuantity, updateObserv
   );
 };
 
+const ChefSuggestionBanner = ({ setCategory }: { setCategory: (c: any) => void }) => {
+  const [hour, setHour] = useState(new Date().getHours());
+
+  // Update hour periodically in case the user keeps the app open
+  React.useEffect(() => {
+    const timer = setInterval(() => setHour(new Date().getHours()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  let config = {
+    title: "Sugestão do \nChef Hortal 👨‍🍳",
+    subtitle: "Destaque do Dia",
+    description: "Experimente nosso Pão Italiano Rústico, fornada fresquinha saindo agora.",
+    buttonText: "Ver todos os pães",
+    category: 'panificacao',
+    gradient: "from-stone-900 to-stone-800",
+    shadowColor: "shadow-stone-900/50",
+    accent: "text-brand-400",
+    buttonColor: "bg-brand-500",
+    iconColor: "text-white/20"
+  };
+
+  if (hour >= 6 && hour < 12) {
+    // Morning (06:00 - 11:59)
+    config = {
+      title: "Café da Manhã \nCompleto ☕",
+      subtitle: "Comece bem o dia",
+      description: "Nada como um Combo de Pão de Queijo quentinho com Capuccino para dar energia!",
+      buttonText: "Ver Promoções",
+      category: 'promocoes',
+      gradient: "from-amber-500 to-orange-600",
+      shadowColor: "shadow-orange-500/40",
+      accent: "text-white",
+      buttonColor: "bg-white text-orange-600 hover:bg-orange-50",
+      iconColor: "text-white/20"
+    };
+  } else if (hour >= 12 && hour < 18) {
+    // Afternoon (12:00 - 17:59)
+    config = {
+      title: "Tarde Doce \ncom Bolo 🍰",
+      subtitle: "Hora do Lanche",
+      description: "Nosso Bolo de Cenoura com Chocolate acabou de sair do forno. Irresistível!",
+      buttonText: "Ir para Confeitaria",
+      category: 'confeitaria',
+      gradient: "from-pink-500 to-rose-600",
+      shadowColor: "shadow-rose-500/40",
+      accent: "text-white",
+      buttonColor: "bg-white text-rose-600 hover:bg-rose-50",
+      iconColor: "text-white/20"
+    };
+  } else {
+    // Night (18:00 - 05:59)
+    config = {
+      title: "Fome de Leão? \nX-Salada! 🍔",
+      subtitle: "Jantar Especial",
+      description: "Mate sua fome com nosso X-Salada no Pão Francês. Saboroso e caprichado.",
+      buttonText: "Pedir Lanche",
+      category: 'lanches',
+      gradient: "from-indigo-600 to-purple-800",
+      shadowColor: "shadow-indigo-500/40",
+      accent: "text-indigo-200",
+      buttonColor: "bg-white text-indigo-700 hover:bg-indigo-50",
+      iconColor: "text-white/10"
+    };
+  }
+
+  return (
+    <div className="px-4 mb-8">
+      <div className={`bg-gradient-to-br ${config.gradient} rounded-[2rem] p-6 relative overflow-hidden shadow-2xl ${config.shadowColor} animate-pulse-slow`}>
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl animate-pulse"></div>
+
+        <div className="relative z-10">
+          <span className={`${config.accent} text-[10px] font-black uppercase tracking-[0.3em] bg-white/10 px-2 py-1 rounded-lg backdrop-blur-sm`}>{config.subtitle}</span>
+          <h2 className="text-white text-2xl font-black mt-3 leading-tight whitespace-pre-line drop-shadow-lg">{config.title}</h2>
+          <p className="text-white/90 text-sm mt-3 leading-relaxed max-w-[220px] font-medium drop-shadow-md">{config.description}</p>
+          <button
+            onClick={() => setCategory(config.category)}
+            className={`mt-6 ${config.buttonColor} px-6 py-3 rounded-2xl font-black text-xs transition-all active:scale-95 shadow-lg flex items-center gap-2 group`}
+          >
+            {config.buttonText}
+          </button>
+        </div>
+
+        <div className={`absolute bottom-0 right-0 w-48 h-48 pointer-events-none transform translate-x-10 translate-y-10 ${config.iconColor}`}>
+          <Store size={180} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user } = useUser();
   const { products } = useProducts();
@@ -175,25 +266,7 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
 
       <div className="flex-1 w-full bg-stone-50 overflow-y-auto pt-4 pb-40">
         {category === 'all' && searchTerm === '' && (
-          <div className="px-4 mb-8">
-            <div className="bg-gradient-to-br from-stone-900 to-stone-800 rounded-[2rem] p-6 relative overflow-hidden shadow-2xl">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-              <div className="relative z-10">
-                <span className="text-brand-400 text-[10px] font-black uppercase tracking-[0.3em]">Destaque do Dia</span>
-                <h2 className="text-white text-2xl font-black mt-2 leading-tight">Sugestão do <br />Chef Hortal 👨‍🍳</h2>
-                <p className="text-stone-400 text-sm mt-3 leading-relaxed max-w-[200px]">Experimente nosso Pão Italiano Rústico, fornada fresquinha saindo agora.</p>
-                <button
-                  onClick={() => setCategory('panificacao')}
-                  className="mt-6 bg-brand-500 text-white px-6 py-3 rounded-2xl font-black text-xs hover:bg-brand-600 transition-all active:scale-95 shadow-lg shadow-brand-500/30"
-                >
-                  Ver todos os pães
-                </button>
-              </div>
-              <div className="absolute bottom-0 right-0 w-48 h-48 opacity-20 pointer-events-none">
-                <Store size={180} />
-              </div>
-            </div>
-          </div>
+          <ChefSuggestionBanner setCategory={setCategory} />
         )}
 
         <div className="px-4 mb-4 flex items-center justify-between">
