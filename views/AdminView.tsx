@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Settings, LogOut, TrendingUp, Package, Sparkles, UserPlus, Users, MessageSquare, UtensilsCrossed,
   MapPin, Phone, CreditCard, Printer, Search, Minus, Plus, Edit3, Eye, EyeOff, Save, X, CheckCircle2,
-  Truck, ShoppingBag, Image as ImageIcon, AlignLeft, Upload, Send
+  Truck, ShoppingBag, Image as ImageIcon, AlignLeft, Upload, Send, Bell
 } from 'lucide-react';
 import { Button, Input } from '../components/UI';
 import { useUser } from '../contexts/UserContext';
@@ -32,6 +32,10 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
   const [searchUser, setSearchUser] = useState('');
   const [showSettingsSuccess, setShowSettingsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // New Message Alert State
+  const [newMessageAlert, setNewMessageAlert] = useState<{ show: boolean; customerName: string; text: string } | null>(null);
+  const previousMessagesCount = useRef<number>(messages.length);
 
   // Customer Management State
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -85,6 +89,55 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
   }, [allUsers, manualCustomerSearch]);
 
   const { sendMessage } = useOrder();
+
+  // Effect to detect new customer messages and show alert
+  useEffect(() => {
+    if (messages.length > previousMessagesCount.current) {
+      // Check if the new message is from a customer (not admin)
+      const newMessages = messages.slice(previousMessagesCount.current);
+      const customerMessage = newMessages.find(m => !m.isAdmin);
+
+      if (customerMessage) {
+        const customerName = allUsers.find(u => u.id === customerMessage.customerId)?.name || 'Cliente';
+        setNewMessageAlert({
+          show: true,
+          customerName,
+          text: customerMessage.text.length > 50 ? customerMessage.text.substring(0, 50) + '...' : customerMessage.text
+        });
+
+        // Play notification sound
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = 800;
+          oscillator.type = 'sine';
+          gainNode.gain.value = 0.3;
+
+          oscillator.start();
+          setTimeout(() => {
+            oscillator.frequency.value = 1000;
+          }, 100);
+          setTimeout(() => {
+            oscillator.stop();
+            audioContext.close();
+          }, 200);
+        } catch (e) {
+          console.log('Audio notification not supported');
+        }
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          setNewMessageAlert(null);
+        }, 5000);
+      }
+    }
+    previousMessagesCount.current = messages.length;
+  }, [messages, allUsers]);
 
   const handleAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,6 +460,38 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
 
   return (
     <div className="pb-24 bg-stone-50 min-h-screen">
+      {/* New Message Alert */}
+      {newMessageAlert && (
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-bounce"
+          onClick={() => {
+            setNewMessageAlert(null);
+            setActiveTab('messages');
+          }}
+        >
+          <div className="bg-brand-500 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-brand-500/30 flex items-center gap-4 cursor-pointer hover:bg-brand-600 transition-all max-w-[90vw]">
+            <div className="bg-white/20 p-3 rounded-full animate-pulse">
+              <Bell size={24} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-block w-2 h-2 bg-white rounded-full animate-ping"></span>
+                Nova mensagem de {newMessageAlert.customerName}
+              </p>
+              <p className="text-xs text-brand-100 truncate">{newMessageAlert.text}</p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setNewMessageAlert(null);
+              }}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="bg-stone-900 text-white p-6 rounded-b-[30px] mb-6 shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold flex items-center gap-2"><Settings className="text-brand-50" /> Admin</h2>
