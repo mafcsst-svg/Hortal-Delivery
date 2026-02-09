@@ -492,7 +492,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           </div>
         </div>
       )}
-      <div className="bg-stone-900 text-white p-6 rounded-b-[30px] mb-6 shadow-2xl">
+      <div className="bg-stone-900 text-white p-6 rounded-b-[30px] mb-6 shadow-2xl relative z-10">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold flex items-center gap-2"><Settings className="text-brand-50" /> Admin</h2>
