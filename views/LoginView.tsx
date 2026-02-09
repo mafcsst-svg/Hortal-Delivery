@@ -50,10 +50,12 @@ export const LoginView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           setError('Verifique seu e-mail para confirmar o cadastro.');
         }
       } else {
+        console.log("Tentando login com:", formData.email);
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
+        console.log("Resposta do Supabase Auth:", { data, signInError });
 
         if (signInError) throw signInError;
 
