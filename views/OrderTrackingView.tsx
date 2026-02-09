@@ -56,7 +56,7 @@ export const SuccessView = ({ earnedCashback, setCurrentView }: { earnedCashback
 };
 
 export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
-   const { orders, setOrders, refreshOrders } = useOrder();
+   const { orders, setOrders, refreshOrders, updateOrderRating } = useOrder();
 
    useEffect(() => {
       refreshOrders();
@@ -110,14 +110,14 @@ export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: View
          setThankYouMessage(msg);
          setShowThankYou(true);
 
-         setTimeout(() => {
-            setOrders((prev) => prev.map(o => o.id === currentOrder.id ? { ...o, rating, ratingComment: comment } : o));
+         setTimeout(async () => {
+            await updateOrderRating(currentOrder.id, rating, comment);
             setShowThankYou(false);
          }, 3000);
       };
 
-      const handleSkip = () => {
-         setOrders((prev) => prev.map(o => o.id === currentOrder.id ? { ...o, ratingSkipped: true } : o));
+      const handleSkip = async () => {
+         await updateOrderRating(currentOrder.id, 0, undefined, true);
       };
 
       if (showThankYou) {

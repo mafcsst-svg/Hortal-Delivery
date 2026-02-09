@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { CartItem, Order, Message, Product } from '../types';
+import { CartItem, Order, Message, Product, OrderStatus } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { useUser } from './UserContext';
 
@@ -17,7 +17,8 @@ interface OrderContextType {
   updateObservation: (id: string, obs: string) => void;
   clearCart: () => void;
   refreshOrders: () => Promise<void>;
-  updateOrderStatus: (orderId: string, nextStatus: any) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderRating: (orderId: string, rating: number, comment?: string, skipped?: boolean) => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -35,6 +36,26 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [earnedCashback, setEarnedCashback] = useState(0);
+
+  const updateOrderRating = async (orderId: string, rating: number, comment?: string, skipped?: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          rating,
+          rating_comment: comment,
+          rating_skipped: skipped
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, rating, ratingComment: comment, ratingSkipped: skipped } : o));
+    } catch (err) {
+      console.error('Error updating order rating:', err);
+      throw err;
+    }
+  };
 
   const fetchOrders = async () => {
     if (!user) {
@@ -78,9 +99,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           deliveryFee: Number(o.delivery_fee),
           paymentMethod: o.payment_method,
           paymentDetail: o.payment_detail,
-          status: o.status,
+          status: o.status as OrderStatus,
           deliveryCode: o.delivery_code,
-          cashbackEarned: Number(o.cashback_earned)
+          rating: o.rating,
+          ratingComment: o.rating_comment,
+          ratingSkipped: o.rating_skipped,
+          cashbackEarned: Number(o.cashback_earned) || 0
         }));
         setOrders(mappedOrders);
       }
@@ -173,7 +197,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearCart = () => setCart([]);
 
-  const updateOrderStatus = async (orderId: string, nextStatus: any) => {
+  const updateOrderStatus = async (orderId: string, nextStatus: OrderStatus) => {
     try {
       // Optimistic update
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
@@ -212,7 +236,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       earnedCashback, setEarnedCashback,
       addToCart, updateCartQuantity, updateObservation, clearCart,
       refreshOrders: fetchOrders,
-      updateOrderStatus
+      updateOrderStatus,
+      updateOrderRating
     }}>
       {children}
     </OrderContext.Provider>
