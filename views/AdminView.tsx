@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Settings, LogOut, TrendingUp, Package, Sparkles, UserPlus, Users, MessageSquare, UtensilsCrossed,
   MapPin, Phone, CreditCard, Printer, Search, Minus, Plus, Edit3, Eye, EyeOff, Save, X, CheckCircle2,
-  Truck, ShoppingBag, Image as ImageIcon, AlignLeft, Upload
+  Truck, ShoppingBag, Image as ImageIcon, AlignLeft, Upload, Send
 } from 'lucide-react';
 import { Button, Input } from '../components/UI';
 import { useUser } from '../contexts/UserContext';
@@ -84,21 +84,18 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
     );
   }, [allUsers, manualCustomerSearch]);
 
-  const handleAdminReply = (e: React.FormEvent) => {
+  const { sendMessage } = useOrder();
+
+  const handleAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminInput.trim() || !selectedUserChat) return;
 
-    const reply: Message = {
-      id: `admin-${selectedUserChat}-${Date.now()}`,
-      senderId: 'admin',
-      senderName: 'Padaria Hortal',
-      text: adminInput,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isAdmin: true
-    };
-
-    setMessages((prev) => [...prev, reply]);
-    setAdminInput('');
+    try {
+      await sendMessage(adminInput, selectedUserChat);
+      setAdminInput('');
+    } catch (err) {
+      alert('Erro ao enviar resposta.');
+    }
   };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: OrderStatus) => {
@@ -539,6 +536,88 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           </div>
         )}
 
+        {activeTab === 'messages' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[70vh]">
+            {/* Thread List */}
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-stone-100 flex flex-col gap-4">
+              <h3 className="font-bold text-stone-800 flex items-center gap-2">
+                <MessageSquare size={18} className="text-brand-500" /> Conversas
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                {(() => {
+                  const threads = Array.from(new Set(messages.map(m => m.customerId)));
+                  if (threads.length === 0) return <p className="text-center py-10 text-stone-400 text-xs text-pretty italic">Nenhuma conversa iniciada.</p>;
+
+                  return threads.map(cid => {
+                    const lastMsg = [...messages].reverse().find(m => m.customerId === cid);
+                    const customer = allUsers.find(u => u.id === cid);
+                    return (
+                      <div
+                        key={cid}
+                        onClick={() => setSelectedUserChat(cid)}
+                        className={`p-3 rounded-2xl border cursor-pointer transition-all ${selectedUserChat === cid ? 'bg-brand-50 border-brand-200' : 'bg-stone-50 border-transparent hover:border-stone-200'}`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <p className="font-bold text-xs text-stone-900">{customer?.name || 'Cliente'}</p>
+                          <span className="text-[9px] text-stone-400">{lastMsg?.timestamp}</span>
+                        </div>
+                        <p className="text-[10px] text-stone-500 line-clamp-1 italic">{lastMsg?.text}</p>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Chat Content */}
+            <div className="md:col-span-2 bg-white rounded-3xl shadow-sm border border-stone-100 flex flex-col overflow-hidden">
+              {selectedUserChat ? (
+                <>
+                  <div className="p-4 border-b border-stone-50 flex items-center gap-3 bg-stone-50/50">
+                    <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-xs uppercase">
+                      {allUsers.find(u => u.id === selectedUserChat)?.name.charAt(0) || 'C'}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-stone-800">{allUsers.find(u => u.id === selectedUserChat)?.name || 'Carregando...'}</h4>
+                      <p className="text-[10px] text-stone-400">{allUsers.find(u => u.id === selectedUserChat)?.phone}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-stone-50/30">
+                    {messages.filter(m => m.customerId === selectedUserChat).map(m => (
+                      <div key={m.id} className={`flex ${m.isAdmin ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] p-3 rounded-2xl text-xs shadow-sm ${m.isAdmin ? 'bg-brand-500 text-white rounded-tr-none' : 'bg-white text-stone-800 rounded-tl-none border border-stone-100'}`}>
+                          <p className="leading-relaxed">{m.text}</p>
+                          <p className={`text-[9px] mt-1 text-right ${m.isAdmin ? 'text-brand-100' : 'text-stone-400'}`}>{m.timestamp}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <form onSubmit={handleAdminReply} className="p-4 bg-white border-t border-stone-100 flex gap-2">
+                    <input
+                      type="text"
+                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-brand-500"
+                      placeholder="Resposta rápida..."
+                      value={adminInput}
+                      onChange={(e) => setAdminInput(e.target.value)}
+                    />
+                    <button type="submit" disabled={!adminInput.trim()} className="bg-brand-500 text-white p-3 rounded-xl disabled:opacity-50 transition-all shadow-md active:scale-95">
+                      <Send size={18} />
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-stone-300 p-10 text-center gap-4">
+                  <div className="bg-stone-50 p-6 rounded-full">
+                    <MessageSquare size={48} className="opacity-20" />
+                  </div>
+                  <p className="text-sm font-medium">Selecione uma conversa para começar a responder.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'manual-order' && (
           <div className="space-y-6 pb-24">
             {/* Product Selection */}

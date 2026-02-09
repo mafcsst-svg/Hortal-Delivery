@@ -6,7 +6,7 @@ import { Message, ViewState } from '../types';
 
 export const ChatView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user } = useUser();
-  const { messages, setMessages } = useOrder();
+  const { messages, sendMessage } = useOrder();
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -14,24 +14,19 @@ export const ChatView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !user) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: user.id,
-      senderName: user.name,
-      text: inputText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isAdmin: false
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText('');
+    try {
+      await sendMessage(inputText);
+      setInputText('');
+    } catch (err) {
+      alert('Erro ao enviar mensagem. Tente novamente.');
+    }
   };
 
-  const userMessages = messages.filter((m) => m.senderId === user?.id || (m.isAdmin && m.id.includes(user?.id || '')));
+  const userMessages = messages.filter((m) => m.customerId === user?.id);
 
   return (
     <div className="flex flex-col h-screen bg-stone-50">
@@ -58,8 +53,8 @@ export const ChatView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
       </div>
 
       <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-stone-100 flex gap-2">
-        <input 
-          type="text" 
+        <input
+          type="text"
           className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-brand-500"
           placeholder="Digite sua mensagem..."
           value={inputText}

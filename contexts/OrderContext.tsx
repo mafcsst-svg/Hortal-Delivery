@@ -19,6 +19,7 @@ interface OrderContextType {
   refreshOrders: () => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   updateOrderRating: (orderId: string, rating: number, comment?: string, skipped?: boolean) => Promise<void>;
+  sendMessage: (text: string, customerId?: string) => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -30,10 +31,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const channelRef = useRef<any>(null);
 
   // Keep messages in localStorage for now
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const savedMessages = localStorage.getItem('hortal_messages');
-    return savedMessages ? JSON.parse(savedMessages) : [];
-  });
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const [earnedCashback, setEarnedCashback] = useState(0);
 
@@ -113,8 +111,53 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const fetchMessages = async () => {
+    if (!user) return;
+    try {
+      let query = supabase.from('messages').select('*');
+      if (user.role !== 'admin') {
+        query = query.eq('customer_id', user.id);
+      }
+      const { data, error } = await query.order('created_at', { ascending: true });
+      if (error) throw error;
+      if (data) {
+        setMessages(data.map(m => ({
+          id: m.id,
+          senderId: m.sender_id,
+          senderName: m.sender_name,
+          customerId: m.customer_id,
+          text: m.text,
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isAdmin: m.is_admin,
+          createdAt: m.created_at
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching messages:', err);
+    }
+  };
+
+  const sendMessage = async (text: string, customerId?: string) => {
+    if (!user) return;
+    const targetCustomerId = customerId || user.id;
+    try {
+      const { error } = await supabase.from('messages').insert({
+        sender_id: user.id,
+        customer_id: targetCustomerId,
+        text,
+        is_admin: user.role === 'admin',
+        sender_name: user.role === 'admin' ? 'Padaria Hortal' : user.name
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error sending message:', err);
+      throw err;
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
+    fetchMessages();
 
     // 1. Subscribe to Postgres Changes (DB backup)
     const dbChannel = supabase
@@ -142,7 +185,39 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       )
       .subscribe();
 
-    // 2. Subscribe to Broadcast (Instant Soft Sync)
+    // 2. Subscribe to Messages Changes
+    const msgChannel = supabase
+      .channel('db-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('Postgres Change Message:', payload.new);
+          const m = payload.new;
+          const newMessage: Message = {
+            id: m.id,
+            senderId: m.sender_id,
+            senderName: m.sender_name,
+            customerId: m.customer_id,
+            text: m.text,
+            timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isAdmin: m.is_admin,
+            createdAt: m.created_at
+          };
+
+          setMessages(prev => {
+            if (prev.find(existing => existing.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+        }
+      )
+      .subscribe();
+
+    // 3. Subscribe to Broadcast (Instant Soft Sync)
     const syncChannel = supabase
       .channel('orders-sync')
       .on('broadcast', { event: 'order_status_sync' }, ({ payload }) => {
@@ -158,7 +233,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     channelRef.current = syncChannel;
 
-    // 3. Fallback: Polling every 30s only for admin
+    // 4. Fallback: Polling every 30s only for admin
     let interval: any = null;
     if (user?.role === 'admin') {
       interval = setInterval(() => {
@@ -169,15 +244,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return () => {
       supabase.removeChannel(dbChannel);
+      supabase.removeChannel(msgChannel);
       supabase.removeChannel(syncChannel);
       channelRef.current = null;
       if (interval) clearInterval(interval);
     };
   }, [user?.id, user?.role]);
 
-  useEffect(() => {
-    localStorage.setItem('hortal_messages', JSON.stringify(messages));
-  }, [messages]);
+  // Removed localStorage sync for messages as we use Supabase now
 
   const addToCart = (product: Product, quantity: number) => {
     setCart((prev) => {
@@ -259,7 +333,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       addToCart, updateCartQuantity, updateObservation, clearCart,
       refreshOrders: fetchOrders,
       updateOrderStatus,
-      updateOrderRating
+      updateOrderRating,
+      sendMessage
     }}>
       {children}
     </OrderContext.Provider>

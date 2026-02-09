@@ -69,11 +69,17 @@ export const OrderTrackingView = ({ setCurrentView }: { setCurrentView: (v: View
       );
       if (processingOrder) return processingOrder;
 
-      // 2. If no in-progress, only consider the absolute newest completed order for rating
+      // 2. If no in-progress, only consider the newest completed order if it's RECENT (last 24h)
       const latestCompleted = orders.find((o: Order) => o.status === 'completed');
 
       if (latestCompleted && !latestCompleted.rating && !latestCompleted.ratingSkipped) {
-         return latestCompleted;
+         const orderDate = new Date(latestCompleted.date).getTime();
+         const now = new Date().getTime();
+         const hoursSinceOrder = (now - orderDate) / (1000 * 60 * 60);
+
+         if (hoursSinceOrder < 24) {
+            return latestCompleted;
+         }
       }
 
       return null;

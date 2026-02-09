@@ -69,9 +69,11 @@ export interface Message {
   id: string;
   senderId: string;
   senderName: string;
+  customerId: string;
   text: string;
   timestamp: string;
   isAdmin: boolean;
+  createdAt?: string;
 }
 
 export interface AppSettings {
