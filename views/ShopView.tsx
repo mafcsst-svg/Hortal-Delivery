@@ -257,6 +257,3 @@ export const ShopView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =>
     </div>
   );
 };
-    </div >
-  );
-};
