@@ -128,7 +128,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         },
         (payload) => {
           console.log('Postgres Change Order:', payload.eventType);
-          fetchOrders();
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new;
+            setOrders(prev => prev.map(o => o.id === updated.id ? {
+              ...o,
+              status: updated.status as OrderStatus,
+              deliveryCode: updated.delivery_code || o.deliveryCode
+            } : o));
+          } else {
+            fetchOrders();
+          }
         }
       )
       .subscribe();
@@ -212,13 +221,26 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Broadcast via the EXISTING stable sync channel
       const activeChannel = channelRef.current || supabase.channel('orders-sync');
 
-      await activeChannel.send({
-        type: 'broadcast',
-        event: 'order_status_sync',
-        payload: { orderId, status: nextStatus }
-      });
-
-      console.log('Instant Sync Broadcast Sent for:', nextStatus);
+      // Ensure the channel is subscribed if we just created it
+      if (!channelRef.current) {
+        activeChannel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await activeChannel.send({
+              type: 'broadcast',
+              event: 'order_status_sync',
+              payload: { orderId, status: nextStatus }
+            });
+            console.log('Instant Sync Broadcast Sent (delayed) for:', nextStatus);
+          }
+        });
+      } else {
+        await activeChannel.send({
+          type: 'broadcast',
+          event: 'order_status_sync',
+          payload: { orderId, status: nextStatus }
+        });
+        console.log('Instant Sync Broadcast Sent for:', nextStatus);
+      }
 
       await fetchOrders();
     } catch (err: any) {
