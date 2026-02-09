@@ -254,6 +254,39 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // ------------------------------------------------------------------
+  // AUDIO NOTIFICATION LOGIC
+  // ------------------------------------------------------------------
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = 800; // Start frequency
+      oscillator.type = 'sine';
+      gainNode.gain.value = 0.3;
+
+      oscillator.start();
+
+      // Pitch up effect
+      setTimeout(() => {
+        oscillator.frequency.value = 1200;
+      }, 100);
+
+      // Stop
+      setTimeout(() => {
+        oscillator.stop();
+        audioContext.close();
+      }, 300);
+    } catch (e) {
+      console.warn('Audio notification blocked or not supported', e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchOrders();
     fetchMessages();
@@ -290,8 +323,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               status: updated.status as OrderStatus,
               deliveryCode: updated.delivery_code || o.deliveryCode
             } : o));
+          } else if (payload.eventType === 'INSERT') {
+            // New Order via DB
+            console.log('New Order via DB - Playing Sound');
+            if (user?.role === 'admin') playNotificationSound();
+            fetchOrders();
           } else {
-            // INSERT or DELETE
             fetchOrders();
           }
         }
@@ -306,6 +343,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Admin sees all. Customer sees only their own.
           if (user?.role !== 'admin' && m.customer_id !== user?.id) {
             return;
+          }
+
+          // Play sound logic
+          if (user?.role === 'admin' && !m.is_admin) {
+            playNotificationSound();
+          } else if (user?.role !== 'admin' && m.is_admin) {
+            playNotificationSound();
           }
 
           const newMessage: Message = {
@@ -346,6 +390,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // 4. Broadcast: New Order Alert
       .on('broadcast', { event: 'new_order' }, () => {
         console.log('Broadcast New Order Alert!');
+        if (user?.role === 'admin') playNotificationSound();
         fetchOrders();
       })
       // 5. Broadcast: Instant Message Sync
@@ -353,6 +398,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log('Broadcast Message Received:', payload);
         const newMessage = payload as Message;
         if (user?.role !== 'admin' && newMessage.customerId !== user?.id) return;
+
+        // Play sound logic
+        if (user?.role === 'admin' && !newMessage.isAdmin) {
+          playNotificationSound();
+        } else if (user?.role !== 'admin' && newMessage.isAdmin) {
+          playNotificationSound();
+        }
 
         setMessages(prev => {
           if (prev.find(m => m.id === newMessage.id)) return prev;
@@ -402,7 +454,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearInterval(messageInterval);
       if (orderInterval) clearInterval(orderInterval);
     };
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, playNotificationSound]);
 
   // Removed localStorage sync for messages as we use Supabase now
 
