@@ -12,6 +12,7 @@ import { ViewState, Order, OrderStatus, CartItem, Product, ProductCategory, Mess
 import { generateProductDescription, suggestPrice } from '../services/geminiService';
 import { APP_NAME, APP_SUBTITLE } from '../constants';
 import { supabase } from '../services/supabaseClient';
+import { soundService } from '../utils/audio';
 
 export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user, updateUserProfile, allUsers, setAllUsers, settings, setSettings, logout } = useUser();
@@ -37,6 +38,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
 
   // New Message Alert State
   const [newMessageAlert, setNewMessageAlert] = useState<{ show: boolean; customerName: string; text: string } | null>(null);
+  const [newOrderAlert, setNewOrderAlert] = useState<{ show: boolean; orderId: string; customerName: string; total: number } | null>(null);
   const previousMessagesCount = useRef<number>(messages.length);
 
   // Customer Management State
@@ -100,39 +102,22 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           text: customerMessage.text.length > 50 ? customerMessage.text.substring(0, 50) + '...' : customerMessage.text
         });
 
-        // Play notification sound
-        try {
-          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
-
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-
-          oscillator.frequency.value = 800;
-          oscillator.type = 'sine';
-          gainNode.gain.value = 0.3;
-
-          oscillator.start();
-          setTimeout(() => {
-            oscillator.frequency.value = 1000;
-          }, 100);
-          setTimeout(() => {
-            oscillator.stop();
-            audioContext.close();
-          }, 200);
-        } catch (e) {
-          console.log('Audio notification not supported');
-        }
-
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          setNewMessageAlert(null);
-        }, 5000);
+        // No auto-hide for persistent alert
       }
     }
     previousMessagesCount.current = messages.length;
   }, [messages, allUsers]);
+
+  // Unlock audio on mount (or attempt to)
+  useEffect(() => {
+    const unlock = () => soundService.unlock();
+    window.addEventListener('click', unlock);
+    window.addEventListener('touchstart', unlock);
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
 
   const handleAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -500,6 +485,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-bounce"
           onClick={() => {
             setNewMessageAlert(null);
+            soundService.stopLoop();
             setActiveTab('messages');
           }}
         >
@@ -518,6 +504,42 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
               onClick={(e) => {
                 e.stopPropagation();
                 setNewMessageAlert(null);
+                soundService.stopLoop();
+              }}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* New Order Alert */}
+      {newOrderAlert && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-bounce"
+          onClick={() => {
+            setNewOrderAlert(null);
+            soundService.stopLoop();
+            setActiveTab('orders');
+          }}
+        >
+          <div className="bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-green-600/30 flex items-center gap-4 cursor-pointer hover:bg-green-700 transition-all max-w-[90vw]">
+            <div className="bg-white/20 p-3 rounded-full animate-pulse">
+              <Package size={24} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-block w-2 h-2 bg-white rounded-full animate-ping"></span>
+                Novo Pedido #{newOrderAlert.orderId.slice(-4)}
+              </p>
+              <p className="text-xs text-green-100 truncate">{newOrderAlert.customerName} • {formatCurrency(newOrderAlert.total)}</p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setNewOrderAlert(null);
+                soundService.stopLoop();
               }}
               className="p-2 hover:bg-white/20 rounded-lg transition-colors"
             >
@@ -988,7 +1010,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value as ProductCategory })}
                   >
                     {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -1074,7 +1096,7 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
                           <p className="text-xs font-bold text-stone-800">{p.name}</p>
                           {!p.active && <span className="text-[10px] bg-stone-200 text-stone-500 px-1.5 rounded font-bold">Inativo</span>}
                         </div>
-                        <p className="text-[10px] text-stone-500">{formatCurrency(p.price)} • {categories.find(c => c.id === p.category)?.label}</p>
+                        <p className="text-[10px] text-stone-500">{formatCurrency(p.price)} • {categories.find(c => c.id === p.category)?.name}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

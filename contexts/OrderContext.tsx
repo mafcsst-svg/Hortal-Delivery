@@ -4,6 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { useUser } from './UserContext';
 import { useProducts } from './ProductContext';
 import { chatWithChefHortal } from '../services/geminiService';
+import { soundService } from '../utils/audio';
 
 interface OrderContextType {
   cart: CartItem[];
@@ -257,35 +258,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // ------------------------------------------------------------------
   // AUDIO NOTIFICATION LOGIC
   // ------------------------------------------------------------------
-  const playNotificationSound = useCallback(() => {
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800; // Start frequency
-      oscillator.type = 'sine';
-      gainNode.gain.value = 0.3;
-
-      oscillator.start();
-
-      // Pitch up effect
-      setTimeout(() => {
-        oscillator.frequency.value = 1200;
-      }, 100);
-
-      // Stop
-      setTimeout(() => {
-        oscillator.stop();
-        audioContext.close();
-      }, 300);
-    } catch (e) {
-      console.warn('Audio notification blocked or not supported', e);
-    }
-  }, []);
 
   useEffect(() => {
     fetchOrders();
@@ -326,7 +298,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } else if (payload.eventType === 'INSERT') {
             // New Order via DB
             console.log('New Order via DB - Playing Sound');
-            if (user?.role === 'admin') playNotificationSound();
+            if (user?.role === 'admin') soundService.startLoop('alert');
             fetchOrders();
           } else {
             fetchOrders();
@@ -347,9 +319,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           // Play sound logic
           if (user?.role === 'admin' && !m.is_admin) {
-            playNotificationSound();
+            soundService.startLoop('beep');
           } else if (user?.role !== 'admin' && m.is_admin) {
-            playNotificationSound();
+            soundService.startLoop('beep');
           }
 
           const newMessage: Message = {
@@ -390,7 +362,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // 4. Broadcast: New Order Alert
       .on('broadcast', { event: 'new_order' }, () => {
         console.log('Broadcast New Order Alert!');
-        if (user?.role === 'admin') playNotificationSound();
+        if (user?.role === 'admin') soundService.startLoop('alert');
         fetchOrders();
       })
       // 5. Broadcast: Instant Message Sync
@@ -401,9 +373,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         // Play sound logic
         if (user?.role === 'admin' && !newMessage.isAdmin) {
-          playNotificationSound();
+          soundService.startLoop('beep');
         } else if (user?.role !== 'admin' && newMessage.isAdmin) {
-          playNotificationSound();
+          soundService.startLoop('beep');
         }
 
         setMessages(prev => {
@@ -454,7 +426,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearInterval(messageInterval);
       if (orderInterval) clearInterval(orderInterval);
     };
-  }, [user?.id, user?.role, playNotificationSound]);
+  }, [user?.id, user?.role]);
 
   // Removed localStorage sync for messages as we use Supabase now
 
