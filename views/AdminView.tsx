@@ -1091,6 +1091,84 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           </div>
         )}
 
+        {activeTab === 'categories' && (
+          <div className="space-y-6 pb-10">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
+              <h3 className="font-bold text-lg mb-4">{editingCategory.id ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+              <div className="space-y-4">
+                <Input
+                  label="Nome da Categoria"
+                  value={editingCategory.name}
+                  onChange={(e: any) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                  placeholder="Ex: Bebidas, Lanches..."
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Emoji (Ícone)"
+                    value={editingCategory.emoji}
+                    onChange={(e: any) => setEditingCategory({ ...editingCategory, emoji: e.target.value })}
+                    placeholder="Ex: 🍔, 🥤"
+                  />
+                  <Input
+                    label="Ordem de Exibição"
+                    type="number"
+                    value={editingCategory.display_order}
+                    onChange={(e: any) => setEditingCategory({ ...editingCategory, display_order: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  {editingCategory.id && (
+                    <Button type="button" variant="ghost" onClick={() => setEditingCategory({ name: '', emoji: '', display_order: 0, active: true })} className="flex-1">
+                      Cancelar
+                    </Button>
+                  )}
+                  <Button onClick={handleSaveCategory} className="flex-[2] bg-brand-500 hover:bg-brand-600" isLoading={isLoading} disabled={!editingCategory.name}>
+                    <Save size={18} /> {editingCategory.id ? 'Atualizar Categoria' : 'Salvar Categoria'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 space-y-4">
+              <h3 className="font-bold text-stone-800">Categorias Cadastradas</h3>
+              <div className="space-y-2">
+                {categories.length === 0 ? (
+                  <p className="text-center text-stone-400 py-4">Nenhuma categoria encontrada.</p>
+                ) : (
+                  categories.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between p-3 rounded-xl border border-stone-100 bg-stone-50 hover:bg-white transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-white border border-stone-200 flex items-center justify-center text-xl">
+                          {c.emoji || '📦'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-stone-800">{c.name}</p>
+                          <p className="text-[10px] text-stone-500">Ordem: {c.display_order}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setEditingCategory(c); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          className="p-2 text-stone-400 hover:text-brand-500 hover:bg-white rounded-lg transition-all"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(c.id)}
+                          className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <LogOut size={16} className="rotate-180" /> {/* Using LogOut as Delete icon since Trash is not imported */}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'settings' && (
           <div className="space-y-6 pb-10">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 relative">
