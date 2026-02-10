@@ -1,11 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronLeft, User as UserIcon, MapPin, Loader2, Save, LogOut, Trophy, Coins, ArrowUpRight } from 'lucide-react';
 import { Input, Button } from '../components/UI';
 import { useUser } from '../contexts/UserContext';
+import { useOrder } from '../contexts/OrderContext';
 import { ViewState } from '../types';
+
+const LOYALTY_LEVELS = [
+  { name: 'Novo Cliente', emoji: '🌱', minOrders: 0 },
+  { name: 'Cliente Frequente', emoji: '☕', minOrders: 3 },
+  { name: 'Apreciador', emoji: '⭐', minOrders: 8 },
+  { name: 'Conhecedor', emoji: '🧁', minOrders: 15 },
+  { name: 'Explorador Gourmet', emoji: '🏅', minOrders: 25 },
+  { name: 'Cliente Ouro', emoji: '🥇', minOrders: 40 },
+  { name: 'Cliente Diamante', emoji: '💎', minOrders: 60 },
+  { name: 'Embaixador Hortal', emoji: '👑', minOrders: 85 },
+  { name: 'Lenda da Padaria', emoji: '🌟', minOrders: 120 },
+  { name: 'Família Hortal', emoji: '🏠', minOrders: 170 },
+];
+
+function getLoyaltyInfo(completedOrders: number) {
+  let currentLevel = LOYALTY_LEVELS[0];
+  let nextLevel: typeof LOYALTY_LEVELS[0] | null = LOYALTY_LEVELS[1];
+
+  for (let i = LOYALTY_LEVELS.length - 1; i >= 0; i--) {
+    if (completedOrders >= LOYALTY_LEVELS[i].minOrders) {
+      currentLevel = LOYALTY_LEVELS[i];
+      nextLevel = LOYALTY_LEVELS[i + 1] || null;
+      break;
+    }
+  }
+
+  let progress = 100;
+  let remaining = 0;
+  if (nextLevel) {
+    const range = nextLevel.minOrders - currentLevel.minOrders;
+    const done = completedOrders - currentLevel.minOrders;
+    progress = Math.min(100, Math.round((done / range) * 100));
+    remaining = nextLevel.minOrders - completedOrders;
+  }
+
+  return { currentLevel, nextLevel, progress, remaining };
+}
 
 export const ProfileView = ({ setCurrentView }: { setCurrentView: (v: ViewState) => void }) => {
   const { user, updateUserProfile, logout } = useUser();
+  const { orders } = useOrder();
+
+  const completedOrders = useMemo(() => orders.filter(o => o.status === 'completed').length, [orders]);
+  const loyalty = useMemo(() => getLoyaltyInfo(completedOrders), [completedOrders]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
@@ -128,7 +170,7 @@ export const ProfileView = ({ setCurrentView }: { setCurrentView: (v: ViewState)
               <div>
                 <span className="text-brand-200 text-[10px] font-black uppercase tracking-[0.2em]">Nível de Fidelidade</span>
                 <h3 className="text-white text-2xl font-black mt-1 flex items-center gap-2">
-                  Explorador Gourmet <Trophy size={20} className="text-amber-400" />
+                  {loyalty.currentLevel.name} <span>{loyalty.currentLevel.emoji}</span>
                 </h3>
               </div>
               <div className="bg-white/20 backdrop-blur-md p-2 rounded-2xl">
@@ -137,14 +179,31 @@ export const ProfileView = ({ setCurrentView }: { setCurrentView: (v: ViewState)
             </div>
 
             <div className="mt-8">
-              <div className="flex justify-between text-[11px] font-bold text-brand-100 mb-2">
-                <span>Progresso para Próximo Nível</span>
-                <span>75%</span>
-              </div>
-              <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden border border-white/10">
-                <div className="h-full bg-amber-400 w-[75%] rounded-full shadow-[0_0_10px_rgba(251,191,36,0.5)]"></div>
-              </div>
-              <p className="text-[10px] text-brand-200 mt-3 font-medium">Faltam apenas 3 pedidos para você se tornar um <span className="text-white font-bold">Mestre Padeiro 🥖</span></p>
+              {loyalty.nextLevel ? (
+                <>
+                  <div className="flex justify-between text-[11px] font-bold text-brand-100 mb-2">
+                    <span>Progresso para Próximo Nível</span>
+                    <span>{loyalty.progress}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden border border-white/10">
+                    <div className="h-full bg-amber-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.5)] transition-all duration-500" style={{ width: `${loyalty.progress}%` }}></div>
+                  </div>
+                  <p className="text-[10px] text-brand-200 mt-3 font-medium">
+                    {loyalty.remaining === 1
+                      ? <>Falta apenas <span className="text-white font-bold">1 pedido</span> para você se tornar </>
+                      : <>Faltam apenas <span className="text-white font-bold">{loyalty.remaining} pedidos</span> para você se tornar </>
+                    }
+                    <span className="text-white font-bold">{loyalty.nextLevel.name} {loyalty.nextLevel.emoji}</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-full h-3 bg-amber-400/50 rounded-full overflow-hidden border border-white/10">
+                    <div className="h-full bg-amber-400 w-full rounded-full shadow-[0_0_10px_rgba(251,191,36,0.5)]"></div>
+                  </div>
+                  <p className="text-[10px] text-brand-200 mt-3 font-medium">Você alcançou o nível máximo! <span className="text-white font-bold">Você faz parte da Família Hortal! 🏠</span></p>
+                </>
+              )}
             </div>
 
             <div className="mt-8 pt-6 border-t border-white/10 flex justify-between items-center">

@@ -102,11 +102,34 @@ export const AdminView = ({ setCurrentView }: { setCurrentView: (v: ViewState) =
           text: customerMessage.text.length > 50 ? customerMessage.text.substring(0, 50) + '...' : customerMessage.text
         });
 
-        // No auto-hide for persistent alert
+        // Play sound loop until dismissed
+        soundService.startLoop('beep');
       }
     }
     previousMessagesCount.current = messages.length;
   }, [messages, allUsers]);
+
+  // Effect to detect new orders and show alert
+  const previousOrdersCount = useRef<number>(orders.length);
+  useEffect(() => {
+    if (orders.length > previousOrdersCount.current) {
+      const newOrders = orders.slice(0, orders.length - previousOrdersCount.current);
+      const latestNewOrder = newOrders.find(o => o.status === 'received');
+
+      if (latestNewOrder) {
+        setNewOrderAlert({
+          show: true,
+          orderId: latestNewOrder.id,
+          customerName: latestNewOrder.customerName,
+          total: latestNewOrder.total
+        });
+
+        // Play sound loop until dismissed
+        soundService.startLoop('alert');
+      }
+    }
+    previousOrdersCount.current = orders.length;
+  }, [orders]);
 
   // Unlock audio on mount (or attempt to)
   useEffect(() => {
